@@ -6,6 +6,8 @@ import logging
 import threading
 import typing as t
 from pathlib import Path
+from collections import deque
+import importlib.resources as pkg_res
 
 from PySide6.QtCore import Qt, QTimer, Signal, Slot, QObject
 from PySide6.QtWidgets import (
@@ -13,13 +15,16 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QProgressBar, QFileDialog, QComboBox,
     QCheckBox, QSpinBox, QTextEdit, QTableWidget, QTableWidgetItem,
     QTabWidget, QGroupBox, QFormLayout, QMessageBox, QSplitter,
-    QListWidget, QListWidgetItem, QInputDialog
+    QListWidget, QListWidgetItem, QInputDialog, QSystemTrayIcon
 )
-from PySide6.QtCore import QRunnable, QThreadPool
+from PySide6.QtCore import QRunnable, QThreadPool, QUrl
+from PySide6.QtMultimedia import QSoundEffect
+from PySide6.QtGui import QIcon
 
 from ..config import (
     DEFAULT_MODEL_SIZE, DEFAULT_LANGUAGE, DEFAULT_MIN_SPEAKERS,
-    DEFAULT_MAX_SPEAKERS, POLL_INTERVAL_MS, Status, HF_TOKEN
+    DEFAULT_MAX_SPEAKERS, POLL_INTERVAL_MS, Status, HF_TOKEN,
+    MAX_CONCURRENT_JOBS
 )
 from ..data.database import DB
 from ..core.pipeline import process_file, JobSettings, PipelineError
@@ -78,6 +83,10 @@ class MainWindow(QMainWindow):
         self.threadpool = QThreadPool()
         logger.info(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
         
+        # Job queue and state
+        self.job_queue = deque()
+        self.job_running = False
+        
         # Set up the UI
         self.init_ui()
         
@@ -92,6 +101,16 @@ class MainWindow(QMainWindow):
         
         # Track current media ID
         self.current_media_id = None
+        
+        # Tray icon (needed for showMessage on mac/Win)
+        self.tray = QSystemTrayIcon(QIcon(), self)  # empty icon is fine
+        self.tray.setVisible(True)
+        
+        # Preload chime
+        mp3_path = str(pkg_res.files("ez_clip_app.assets") / "finish.mp3")
+        self.done_sound = QSoundEffect()
+        self.done_sound.setSource(QUrl.fromLocalFile(mp3_path))
+        self.done_sound.setVolume(0.9)
         
         # Populate library with existing completed media files
         self.refresh_library()
@@ -220,21 +239,25 @@ class MainWindow(QMainWindow):
                 widget.setEnabled(checked)
     
     def on_select_file(self):
-        """Open file dialog and start processing selected file."""
+        """Open file dialog and start processing selected files."""
         file_dialog = QFileDialog()
-        file_path, _ = file_dialog.getOpenFileName(
+        paths, _ = file_dialog.getOpenFileNames(
             self,
-            "Select Media File",
+            "Select Media Files",
             str(Path.home()),
             "Media Files (*.mp4 *.mp3 *.wav *.avi *.mkv *.m4a *.flac);;All Files (*)"
         )
         
-        if not file_path:
+        if not paths:
             return
+            
+        for p in paths:
+            self.enqueue_job(Path(p))
+            
+        self.start_next_job()
         
-        media_path = Path(file_path)
-        self.statusBar().showMessage(f"Selected file: {media_path.name}")
-        
+    def enqueue_job(self, media_path: Path):
+        """Add a job to the queue."""
         # Create job settings
         settings = JobSettings(
             model_size=self.model_combo.currentText(),
@@ -273,6 +296,17 @@ class MainWindow(QMainWindow):
             'file_path': str(media_path)
         }
         
+        # Add to queue
+        self.job_queue.append((media_path, settings, job_id))
+        self.statusBar().showMessage(f"Queued: {media_path.name}")
+        
+    def start_next_job(self):
+        """Start the next job in the queue if not already running a job."""
+        if self.job_running or not self.job_queue:
+            return
+            
+        media_path, settings, job_id = self.job_queue.popleft()
+        
         # Start processing in background thread
         worker = TranscriptionWorker(media_path, settings, self.db)
         worker.signals.progress.connect(lambda p: self.update_progress(job_id, p))
@@ -280,6 +314,7 @@ class MainWindow(QMainWindow):
         worker.signals.error.connect(lambda msg: self.on_job_error(job_id, msg))
         
         self.threadpool.start(worker)
+        self.job_running = True
         self.statusBar().showMessage(f"Processing: {media_path.name}")
     
     def update_progress(self, job_id, progress):
@@ -322,23 +357,51 @@ class MainWindow(QMainWindow):
     
     def on_job_completed(self, job_id, transcript_id):
         """Handle job completion."""
+        self.job_running = False
         self.display_transcript(job_id)
+        
         # Refresh the library to show the newly completed job
         self.refresh_library()
+        
+        # Notify user of completion
+        file_name = Path(self.db.get_media_path(job_id)).name
+        self._notify_done(file_name)
+        
+        # Start the next job in the queue
+        self.start_next_job()
     
     def on_job_error(self, job_id, error_msg):
         """Handle job error."""
+        self.job_running = False
+        
         media_path = Path(self.active_jobs[job_id]['file_path']).name
         QMessageBox.warning(
             self,
             "Transcription Error",
             f"Error processing {media_path}: {error_msg}"
         )
+        
         # Clean up UI for failed job
         job_widget = self.active_jobs[job_id]['widget']
         self.jobs_layout.removeWidget(job_widget)
         job_widget.deleteLater()
         del self.active_jobs[job_id]
+        
+        # Start the next job in the queue
+        self.start_next_job()
+        
+    def _notify_done(self, fname: str):
+        """Play a sound and show notification when job is complete."""
+        # Always play sound
+        self.done_sound.play()
+        
+        # Banner - keep if useful on mac; harmless on Win/Linux
+        self.tray.showMessage(
+            "EZ Clip – Job Finished",
+            f"{fname} is ready!",
+            QSystemTrayIcon.Information,
+            5000
+        )
     
     def refresh_library(self):
         """Refresh the library list with completed media files."""

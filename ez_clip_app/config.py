@@ -31,6 +31,7 @@ HF_TOKEN = os.environ.get("HF_TOKEN")
 
 # Threading configuration
 MAX_WORKERS = int(os.environ.get("MAX_WORKERS", "2"))
+MAX_CONCURRENT_JOBS = 1
 
 # UI configuration
 POLL_INTERVAL_MS = 500  # How often to update progress in UI
