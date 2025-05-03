@@ -12,6 +12,7 @@ from ez_clip_app.config import Status
 from ez_clip_app.data.database import DB
 from ez_clip_app.core import transcribe
 from ez_clip_app.core import diarize
+from ez_clip_app.core.formatting import segments_to_markdown
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -133,10 +134,13 @@ def process_file(
             progress_cb(90)
             db.update_progress(job_id, 90)
         
-        # Save to database
+        # Format the segments into a speaker-aware Markdown string
+        formatted_full_text = segments_to_markdown(segments)
+
+        # Save the formatted transcript and segments to the database
         transcript_id = db.save_transcript(
             job_id,
-            transcription.full_text,
+            formatted_full_text,  # Use the new Markdown formatted text
             transcription.duration,
             segments
         )

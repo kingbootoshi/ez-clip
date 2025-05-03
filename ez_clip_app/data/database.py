@@ -7,8 +7,11 @@ import pathlib
 import contextlib
 import typing as t
 from pathlib import Path
+import logging
 
 from ez_clip_app.config import DB_PATH, Status
+
+logger = logging.getLogger(__name__)
 
 class DB:
     """Database interface for the WhisperX app."""
@@ -105,21 +108,23 @@ class DB:
             )
     
     def save_transcript(self, media_id: int, full_text: str, duration: float, segments: t.List[dict]) -> int:
-        """Save transcript and segments.
+        """Save transcript and segments. Ensures only one transcript row exists per media_id.
         
         Args:
             media_id: Media file ID
-            full_text: Complete transcript text
+            full_text: Complete transcript text (potentially Markdown formatted)
             duration: Audio duration in seconds
             segments: List of segment dictionaries with speaker, timestamps, text, etc.
             
         Returns:
             Transcript ID
         """
+        # Establish a connection and transaction context
         with self._get_connection() as conn:
-            # Delete existing segments for this media_id to prevent duplicates
-            # if the transcript is re-processed.
+            # Delete existing segments and the main transcript row for this media_id
+            # to prevent duplicates and ensure only the latest data is stored.
             conn.execute("DELETE FROM segments WHERE media_id = ?", (media_id,))
+            conn.execute("DELETE FROM transcripts WHERE media_id = ?", (media_id,))
             
             # Insert the main transcript record
             cur = conn.execute(
@@ -171,25 +176,32 @@ class DB:
             ).fetchall()
     
     def get_transcript(self, media_id: int) -> t.Dict:
-        """Get complete transcript with segments for a media file.
+        """Get the most recent complete transcript with segments for a media file.
         
         Args:
             media_id: Media file ID
             
         Returns:
-            Dictionary with transcript and segments
+            Dictionary with transcript and segments, or None if not found.
         """
         with self._get_connection() as conn:
-            # Get transcript
+            # Get the most recent transcript row for the given media_id
             transcript = conn.execute(
-                "SELECT * FROM transcripts WHERE media_id = ?",
+                """
+                SELECT * FROM transcripts
+                WHERE media_id = ?
+                ORDER BY id DESC  -- Fetch the latest entry
+                LIMIT 1           -- Only fetch one
+                """,
                 (media_id,)
             ).fetchone()
-            
+
+            # If no transcript record found, return None
             if not transcript:
+                logger.warning(f"No transcript found for media_id {media_id}")
                 return None
-            
-            # Get segments
+
+            # Get associated segments (still ordered by start time)
             segments = conn.execute(
                 """
                 SELECT * FROM segments

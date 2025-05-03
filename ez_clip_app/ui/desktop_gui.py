@@ -322,7 +322,7 @@ class MainWindow(QMainWindow):
         
         # Display full transcript
         transcript_text = result["transcript"]["full_text"]
-        self.transcript_text.setPlainText(transcript_text)
+        self.transcript_text.setMarkdown(transcript_text)
         
         # Display segments in table
         segments = result["segments"]
