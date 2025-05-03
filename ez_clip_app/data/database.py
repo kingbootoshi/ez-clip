@@ -117,16 +117,23 @@ class DB:
             Transcript ID
         """
         with self._get_connection() as conn:
-            # Insert transcript
+            # Delete existing segments for this media_id to prevent duplicates
+            # if the transcript is re-processed.
+            conn.execute("DELETE FROM segments WHERE media_id = ?", (media_id,))
+            
+            # Insert the main transcript record
             cur = conn.execute(
                 "INSERT INTO transcripts(media_id, full_text, duration) VALUES(?, ?, ?)",
                 (media_id, full_text, duration)
             )
+            # Retrieve the ID of the inserted transcript row
             transcript_id = cur.lastrowid
             
-            # Insert segments
+            # Iterate through the provided segments and insert each one
             for segment in segments:
+                # Serialize the 'words' list (if present) into JSON for storage
                 words_json = json.dumps(segment.get("words", []))
+                # Execute the INSERT statement for the segment
                 conn.execute(
                     """
                     INSERT INTO segments(
@@ -135,14 +142,16 @@ class DB:
                     """,
                     (
                         media_id,
+                        # Use provided speaker or default to 'SPEAKER_UNKNOWN'
                         segment.get("speaker", "SPEAKER_UNKNOWN"),
-                        segment["start"],
-                        segment["end"],
-                        segment["text"],
-                        words_json
+                        segment["start"], # Start time of the segment
+                        segment["end"],   # End time of the segment
+                        segment["text"],  # Text content of the segment
+                        words_json        # JSON string of word timings
                     )
                 )
             
+            # Return the ID of the main transcript record
             return transcript_id
     
     def get_active_jobs(self) -> t.List[sqlite3.Row]:

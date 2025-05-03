@@ -5,12 +5,42 @@ import logging
 import typing as t
 from pathlib import Path
 import whisperx
+from typing import List, Dict
+import json
+import os
+import traceback
+import pandas as pd  # Added for DataFrame conversion in assign_word_speakers
 
 from ez_clip_app.core import model_cache
 from ez_clip_app.config import DEFAULT_MIN_SPEAKERS, DEFAULT_MAX_SPEAKERS
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+
+def _annotation_to_turns(annotation) -> List[Dict]:
+    """
+    Convert pyannote.core.Annotation into WhisperX-compatible
+    list of speaker turns.
+    """
+    turns = []
+    for segment, _, label in annotation.itertracks(yield_label=True):
+        label_str = str(label)
+        speaker_id = label_str.removeprefix("SPEAKER_")
+        turns.append(
+            {
+                "start": float(segment.start),
+                "end":   float(segment.end),
+                "speaker": speaker_id,
+            }
+        )
+    # sort just in case
+    turns = sorted(turns, key=lambda t: t["start"])
+    
+    if os.getenv("EZCLIP_DBG"):
+        logger.debug("[DBG] speaker_turns sample (raw IDs): %s", turns[:3])
+        
+    return turns
 
 
 def diarize(
@@ -44,22 +74,48 @@ def diarize(
             progress_callback(70)
         
         # Perform diarization
-        diarize_segments = diarize_pipeline(
+        annotation = diarize_pipeline(
             str(audio_path),
             min_speakers=min_speakers,
             max_speakers=max_speakers
         )
+        speaker_turns = _annotation_to_turns(annotation)
+        
+        if os.getenv("EZCLIP_DBG") and transcription_segments:
+            logger.debug(
+                "[DBG] transcription_segments[0]: %s | keys=%s",
+                transcription_segments[0],
+                list(transcription_segments[0].keys()))
+            logger.debug(
+                "[DBG] speaker_turns[0]: %s | keys=%s",
+                speaker_turns[0],
+                list(speaker_turns[0].keys()))
+            logger.debug(
+                "[DBG] Counts → turns=%d, segments=%d",
+                len(speaker_turns), len(transcription_segments))
         
         # Update progress
         if progress_callback:
             progress_callback(80)
         
         try:
-            # Assign speaker labels to transcription segments
-            result = whisperx.assign_word_speakers(
-                diarize_segments,
-                transcription_segments
-            )
+            # whisperx.assign_word_speakers expects a pandas DataFrame
+            # with at least [start, end, speaker] columns. Convert our
+            # list-of-dict speaker_turns into the required format.
+
+            diarize_df = pd.DataFrame(speaker_turns)
+
+            # Defensive check – ensure required columns exist to avoid
+            # downstream KeyErrors should whisperX change its API.
+            required_cols = {"start", "end", "speaker"}
+            if not required_cols.issubset(diarize_df.columns):
+                missing = required_cols - set(diarize_df.columns)
+                raise RuntimeError(
+                    f"Diarization DataFrame missing expected columns: {missing}"
+                )
+
+            transcript_dict = {"segments": transcription_segments}
+            result = whisperx.assign_word_speakers(diarize_df, transcript_dict)
             
             # Update progress
             if progress_callback:
@@ -68,19 +124,34 @@ def diarize(
             logger.info(f"Diarization completed: {len(result['segments'])} segments")
             
             return result["segments"]
-        except (KeyError, IndexError, TypeError) as e:
+        except Exception as exc:
+            logger.error("assign_word_speakers() failed: %s", exc)
+            logger.error(traceback.format_exc())
+
+            if os.getenv("EZCLIP_DBG"):
+                dump = {
+                    "speaker_turns": speaker_turns[:10],
+                    "transcription_segments": transcription_segments[:10],
+                    "exception": str(exc),
+                    "traceback": traceback.format_exc(),
+                }
+                dump_path = Path("/tmp/ezclip_dbg_assign_word_speakers.json")
+                dump_path.write_text(json.dumps(dump, indent=2))
+                logger.warning("[DBG] dumped payload to %s", dump_path)
+
             # Handle the case where assignment fails
-            logger.warning(f"Speaker assignment failed: {e}. Falling back to simple assignment.")
+            logger.warning(f"Speaker assignment failed: {exc}. Falling back to simple assignment.")
             
             # Fall back to a simpler speaker assignment approach
             segments = transcription_segments.copy()
             
             # Create a mapping of time to speaker
             speaker_map = {}
-            for segment, track in diarize_segments.itertracks(yield_label=True):
+            for segment, _, label in annotation.itertracks(yield_label=True):
                 start_time = float(segment.start)
                 end_time = float(segment.end)
-                speaker = track
+                label_str = str(label)
+                speaker = label_str.removeprefix("SPEAKER_")
                 
                 # Store speaker for each second (with 0.5s resolution)
                 current_time = start_time
@@ -107,13 +178,17 @@ def diarize(
                 # Assign the most common speaker, or a default if none found
                 if speaker_counts:
                     most_common_speaker = max(speaker_counts.items(), key=lambda x: x[1])[0]
-                    segment["speaker"] = f"SPEAKER_{most_common_speaker}"
+                    segment["speaker"] = most_common_speaker  # Already has SPEAKER_ prefix
                 else:
                     segment["speaker"] = "SPEAKER_UNKNOWN"
             
             # Update progress
             if progress_callback:
                 progress_callback(90)
+            
+            if os.getenv("EZCLIP_DBG"):
+                logger.debug("[DBG] simple-assignment speakers present: %s",
+                             {s['speaker'] for s in segments})
             
             logger.info(f"Simple diarization completed: {len(segments)} segments")
             
