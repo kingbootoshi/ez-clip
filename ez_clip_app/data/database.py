@@ -293,3 +293,22 @@ class DB:
                 """,
                 (media_id, speaker_id, name)
             )
+            
+    def update_transcript_text(self, media_id: int, new_text: str):
+        """Overwrite full_text for latest transcript of media_id.
+        
+        Args:
+            media_id: Media file ID
+            new_text: New transcript text
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE transcripts
+                SET full_text = ?
+                WHERE media_id = ?
+                  AND id = (SELECT id FROM transcripts
+                            WHERE media_id = ? ORDER BY id DESC LIMIT 1)
+                """,
+                (new_text, media_id, media_id)
+            )

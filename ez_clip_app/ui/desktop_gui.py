@@ -23,6 +23,7 @@ from ..config import (
 )
 from ..data.database import DB
 from ..core.pipeline import process_file, JobSettings, PipelineError
+from ..core.formatting import segments_to_markdown
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -392,12 +393,19 @@ class MainWindow(QMainWindow):
         # Get speaker map for this media
         speaker_map = self.db.get_speaker_map(job_id)
         
-        # Display full transcript
-        transcript_text = result["transcript"]["full_text"]
-        self.transcript_text.setMarkdown(transcript_text)
+        # Get segments
+        segments = result["segments"]
+        
+        # Always regenerate Markdown with current speaker names
+        regenerated_markdown = segments_to_markdown(segments, speaker_map)
+        
+        # Display regenerated transcript
+        self.transcript_text.setMarkdown(regenerated_markdown)
+        
+        # Update the DB to persist the regenerated Markdown
+        self.db.update_transcript_text(job_id, regenerated_markdown)
         
         # Display segments in table
-        segments = result["segments"]
         self.segments_table.setRowCount(len(segments))
         
         for i, segment in enumerate(segments):
