@@ -1,0 +1,16 @@
+# Core speech stack
+git+https://github.com/m-bain/whisperX.git
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+pyannote.audio==3.*
+ffmpeg-python>=0.2.0
+
+# App + DB stack
+pyside6>=6.4.0
+python-dotenv>=1.0.0
+tqdm>=4.64.0
+sqlite-utils>=3.30
+
+# Optional dependencies
+matplotlib>=3.6.0
