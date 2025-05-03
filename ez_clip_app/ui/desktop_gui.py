@@ -107,7 +107,7 @@ class MainWindow(QMainWindow):
         self.tray.setVisible(True)
         
         # Preload chime
-        mp3_path = str(pkg_res.files("ez_clip_app.assets") / "finish.mp3")
+        mp3_path = str(pkg_res.files("ez_clip_app.assets") / "finish.wav")
         self.done_sound = QSoundEffect()
         self.done_sound.setSource(QUrl.fromLocalFile(mp3_path))
         self.done_sound.setVolume(0.9)
