@@ -188,7 +188,16 @@ class MainWindow(QMainWindow):
         self.library = QListWidget()
         self.library.setMinimumWidth(200)
         self.library.itemSelectionChanged.connect(self.load_selected_media)
-        splitter.addWidget(self.library)
+        
+        # — Delete button under the library
+        self.delete_btn = QPushButton("Delete Selected")
+        self.delete_btn.clicked.connect(self.delete_selected_media)
+        left_col = QVBoxLayout()          # wrap library + button
+        left_col.addWidget(self.library, 1)
+        left_col.addWidget(self.delete_btn, 0)
+        left_container = QWidget()
+        left_container.setLayout(left_col)
+        splitter.addWidget(left_container)   # add container instead of just library
         
         # Results tabs on the right
         self.results_tabs = QTabWidget()
@@ -402,6 +411,37 @@ class MainWindow(QMainWindow):
             QSystemTrayIcon.Information,
             5000
         )
+        
+    def delete_selected_media(self):
+        item = self.library.currentItem()
+        if not item:
+            return
+
+        media_id = item.data(Qt.UserRole)
+        fname = item.text()
+
+        reply = QMessageBox.question(
+            self,
+            "Delete Transcript",
+            f"Delete all data for \"{fname}\"?\nThis cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        # DB removal
+        self.db.delete_media(media_id)
+
+        # If that transcript is on screen, clear panes
+        if self.current_media_id == media_id:
+            self.current_media_id = None
+            self.transcript_text.clear()
+            self.segments_table.setRowCount(0)
+
+        # Refresh library list
+        self.refresh_library()
+        self.statusBar().showMessage(f"Deleted: {fname}", 3000)
     
     def refresh_library(self):
         """Refresh the library list with completed media files."""

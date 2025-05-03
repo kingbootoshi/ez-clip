@@ -312,3 +312,8 @@ class DB:
                 """,
                 (new_text, media_id, media_id)
             )
+            
+    def delete_media(self, media_id: int):
+        """Completely remove a media file and all its associated data."""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM media_files WHERE id = ?", (media_id,))

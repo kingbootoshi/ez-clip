@@ -23,7 +23,7 @@ DEFAULT_LANGUAGE = "en"        # ISO language code, "auto" for auto-detection
 DEVICE = "cuda" if os.environ.get("USE_GPU", "").lower() == "true" else "cpu"
 
 # Diarization configuration
-DEFAULT_MIN_SPEAKERS = 2
+DEFAULT_MIN_SPEAKERS = 1
 DEFAULT_MAX_SPEAKERS = 4
 
 # HuggingFace token for pyannote.audio
