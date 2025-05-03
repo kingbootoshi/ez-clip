@@ -1,0 +1,12 @@
+# Testing dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-xdist>=3.0.0  # For parallel test execution
+
+# Development tools
+flake8>=6.0.0
+black>=23.0.0
+isort>=5.10.0
+
+# Include all app dependencies
+-r ez_clip_app/requirements.txt 
