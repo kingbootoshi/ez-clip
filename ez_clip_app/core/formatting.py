@@ -10,7 +10,7 @@ from typing import List, Dict
 logger = logging.getLogger(__name__)
 
 
-def segments_to_markdown(segments: List[Dict]) -> str:
+def segments_to_markdown(segments: List[Dict], speaker_map: Dict[str, str] = None) -> str:
     """
     Converts a list of transcription segments into a speaker-aware Markdown string.
 
@@ -23,6 +23,10 @@ def segments_to_markdown(segments: List[Dict]) -> str:
                                have a 'start' key (for sorting) and should have
                                'speaker' and 'text' keys. Missing 'speaker' defaults
                                to 'SPEAKER_UNKNOWN'. Missing 'text' defaults to "".
+        speaker_map (Dict[str, str], optional): A dictionary mapping speaker IDs
+                                               to friendly names. If provided, the
+                                               friendly names will be used in the
+                                               output instead of raw speaker IDs.
 
     Returns:
         str: A Markdown-formatted string representing the transcript with
@@ -58,8 +62,10 @@ def segments_to_markdown(segments: List[Dict]) -> str:
         if current_buffer:
             # Join collected text pieces, strip surrounding whitespace
             joined_text = " ".join(current_buffer).strip()
+            # Get speaker label from speaker_map if available, otherwise use raw speaker ID
+            speaker_label = speaker_map.get(current_speaker, current_speaker) if speaker_map else current_speaker
             # Format the paragraph with speaker ID in bold Markdown
-            formatted_paragraph = f"**{current_speaker}:** {joined_text}"
+            formatted_paragraph = f"**{speaker_label}:** {joined_text}"
             output_paragraphs.append(formatted_paragraph)
             # Clear the buffer for the next speaker turn
             current_buffer.clear()

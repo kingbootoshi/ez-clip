@@ -12,7 +12,8 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QProgressBar, QFileDialog, QComboBox,
     QCheckBox, QSpinBox, QTextEdit, QTableWidget, QTableWidgetItem,
-    QTabWidget, QGroupBox, QFormLayout, QMessageBox, QSplitter
+    QTabWidget, QGroupBox, QFormLayout, QMessageBox, QSplitter,
+    QListWidget, QListWidgetItem, QInputDialog
 )
 from PySide6.QtCore import QRunnable, QThreadPool
 
@@ -87,6 +88,12 @@ class MainWindow(QMainWindow):
         
         # Track active jobs
         self.active_jobs = {}  # {job_id: progress_bar}
+        
+        # Track current media ID
+        self.current_media_id = None
+        
+        # Populate library with existing completed media files
+        self.refresh_library()
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -154,7 +161,16 @@ class MainWindow(QMainWindow):
         self.jobs_layout = QVBoxLayout(self.jobs_group)
         main_layout.addWidget(self.jobs_group)
         
-        # Bottom section - Results display
+        # Bottom section - Library and Results in a splitter
+        splitter = QSplitter(Qt.Horizontal)
+        
+        # Library sidebar on the left
+        self.library = QListWidget()
+        self.library.setMinimumWidth(200)
+        self.library.itemSelectionChanged.connect(self.load_selected_media)
+        splitter.addWidget(self.library)
+        
+        # Results tabs on the right
         self.results_tabs = QTabWidget()
         
         # Transcript tab
@@ -173,13 +189,21 @@ class MainWindow(QMainWindow):
         self.segments_table.setColumnCount(4)
         self.segments_table.setHorizontalHeaderLabels(["Speaker", "Start", "End", "Text"])
         self.segments_table.horizontalHeader().setStretchLastSection(True)
+        # Connect double-click signal for speaker rename
+        self.segments_table.cellDoubleClicked.connect(self.prompt_rename)
         segments_layout.addWidget(self.segments_table)
         
         # Add tabs
         self.results_tabs.addTab(self.transcript_widget, "Full Transcript")
         self.results_tabs.addTab(self.segments_widget, "Segments")
         
-        main_layout.addWidget(self.results_tabs)
+        # Add results_tabs to the splitter
+        splitter.addWidget(self.results_tabs)
+        
+        # Set default sizes (30% for library, 70% for results)
+        splitter.setSizes([300, 700])
+        
+        main_layout.addWidget(splitter)
         
         # Status bar
         self.statusBar().showMessage("Ready")
@@ -278,6 +302,7 @@ class MainWindow(QMainWindow):
                 # If job is done but we haven't processed it yet
                 if status == Status.DONE:
                     self.display_transcript(job_id)
+                    self.refresh_library()
                     self.statusBar().showMessage(f"Transcription complete: {row['filepath']}")
                 
                 # If job has errored but we haven't processed it yet
@@ -297,6 +322,8 @@ class MainWindow(QMainWindow):
     def on_job_completed(self, job_id, transcript_id):
         """Handle job completion."""
         self.display_transcript(job_id)
+        # Refresh the library to show the newly completed job
+        self.refresh_library()
     
     def on_job_error(self, job_id, error_msg):
         """Handle job error."""
@@ -312,6 +339,45 @@ class MainWindow(QMainWindow):
         job_widget.deleteLater()
         del self.active_jobs[job_id]
     
+    def refresh_library(self):
+        """Refresh the library list with completed media files."""
+        self.library.clear()
+        for row in self.db.get_finished_media():
+            item = QListWidgetItem(Path(row["filepath"]).name)
+            item.setData(Qt.UserRole, row["id"])
+            self.library.addItem(item)
+    
+    def load_selected_media(self):
+        """Load the selected media file from the library."""
+        item = self.library.currentItem()
+        if not item:
+            return
+        
+        media_id = item.data(Qt.UserRole)
+        self.display_transcript(media_id)
+    
+    def prompt_rename(self, row, col):
+        """Prompt to rename a speaker when double-clicking the speaker column."""
+        # Only handle clicks on the speaker column (column 0)
+        if col != 0:
+            return
+            
+        speaker_id = self.segments_table.item(row, 0).text()
+        new_name, ok = QInputDialog.getText(
+            self, 
+            "Rename Speaker", 
+            f"New name for {speaker_id}:"
+        )
+        
+        if not ok or not new_name.strip():
+            return
+            
+        # Save the new speaker name to the database
+        self.db.set_speaker_name(self.current_media_id, speaker_id, new_name.strip())
+        
+        # Reload the transcript to show the updated speaker names
+        self.display_transcript(self.current_media_id)
+    
     def display_transcript(self, job_id):
         """Display transcript and segments for completed job."""
         result = self.db.get_transcript(job_id)
@@ -319,6 +385,12 @@ class MainWindow(QMainWindow):
         if not result:
             logger.warning(f"No transcript found for job {job_id}")
             return
+        
+        # Store the current media ID
+        self.current_media_id = job_id
+        
+        # Get speaker map for this media
+        speaker_map = self.db.get_speaker_map(job_id)
         
         # Display full transcript
         transcript_text = result["transcript"]["full_text"]
@@ -329,8 +401,10 @@ class MainWindow(QMainWindow):
         self.segments_table.setRowCount(len(segments))
         
         for i, segment in enumerate(segments):
-            # Speaker
-            speaker_item = QTableWidgetItem(segment["speaker"])
+            # Speaker (use friendly name if available)
+            speaker_id = segment["speaker"]
+            display_name = speaker_map.get(speaker_id, speaker_id)
+            speaker_item = QTableWidgetItem(display_name)
             self.segments_table.setItem(i, 0, speaker_item)
             
             # Start time (format as MM:SS.ms)

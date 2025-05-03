@@ -239,3 +239,57 @@ class DB:
                 (media_id,)
             ).fetchone()
             return row["filepath"] if row else None
+            
+    def get_finished_media(self) -> t.List[sqlite3.Row]:
+        """Get all completed media files.
+        
+        Returns:
+            List of row objects with id, filepath
+        """
+        with self._get_connection() as conn:
+            return conn.execute(
+                """
+                SELECT id, filepath 
+                FROM media_files 
+                WHERE status = ? 
+                ORDER BY added_at DESC
+                """,
+                (Status.DONE,)
+            ).fetchall()
+            
+    def get_speaker_map(self, media_id: int) -> t.Dict[str, str]:
+        """Get speaker name mapping for a media file.
+        
+        Args:
+            media_id: Media file ID
+            
+        Returns:
+            Dictionary mapping speaker IDs to names
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT speaker, name 
+                FROM speakers 
+                WHERE media_id = ?
+                """,
+                (media_id,)
+            ).fetchall()
+        return {row["speaker"]: row["name"] for row in rows}
+        
+    def set_speaker_name(self, media_id: int, speaker_id: str, name: str):
+        """Set a speaker name.
+        
+        Args:
+            media_id: Media file ID
+            speaker_id: Speaker ID
+            name: Speaker name
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO speakers(media_id, speaker, name) 
+                VALUES(?, ?, ?)
+                """,
+                (media_id, speaker_id, name)
+            )

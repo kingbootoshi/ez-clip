@@ -134,8 +134,11 @@ def process_file(
             progress_cb(90)
             db.update_progress(job_id, 90)
         
-        # Format the segments into a speaker-aware Markdown string
-        formatted_full_text = segments_to_markdown(segments)
+        # Get speaker map from database (may be empty)
+        speaker_map = db.get_speaker_map(job_id)
+        
+        # Format the segments into a speaker-aware Markdown string with speaker mapping
+        formatted_full_text = segments_to_markdown(segments, speaker_map)
 
         # Save the formatted transcript and segments to the database
         transcript_id = db.save_transcript(
