@@ -80,9 +80,9 @@ Comprehensive documentation is available in the [docs directory](docs/):
 
 ## 🧪 Technical Details
 
-EasyVid uses state-of-the-art speech processing libraries:
+EZ Clip uses state-of-the-art speech processing libraries:
 
-- **EZ Clip**: Enhanced version of OpenAI's Whisper with improved alignment
+- **WhisperX**: Enhanced version of OpenAI's Whisper with improved alignment
 - **PyAnnote**: For speaker diarization
 - **PySide6**: For cross-platform GUI
 - **SQLite**: For efficient local data storage
