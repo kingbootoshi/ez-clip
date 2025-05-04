@@ -2,6 +2,8 @@
 
 <div align="center">
 
+![EZ_CLIP_BANNER](https://github.com/user-attachments/assets/daf01864-0aae-4749-b14e-dafeaaa0bf77)
+
 *A desktop application for high-accuracy video/audio transcription with speaker diarization*
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
