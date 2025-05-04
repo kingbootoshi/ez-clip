@@ -22,11 +22,11 @@ def test_word_model_basic():
     assert word.w == "world"
     assert word.s == 2.0
     assert word.e == 2.5
-    assert word.score is None
+    assert word.score == 0.0
     
     # Test model_dump() method
     word_dict = word.model_dump()
-    assert word_dict == {"w": "world", "s": 2.0, "e": 2.5, "score": None}
+    assert word_dict == {"w": "world", "s": 2.0, "e": 2.5, "score": 0.0, "speaker": None}
 
 
 def test_word_model_validation_errors():

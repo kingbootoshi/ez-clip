@@ -20,10 +20,20 @@ from ez_clip_app.core.models import Word
 from ez_clip_app.ui import WordToggleView
 
 
-# Skip these tests if running in a headless environment without X server
+# Skip these tests if no QApplication, no pytest-qt, or headless environment
+def has_qt_display():
+    """Check if we have a working Qt environment for testing."""
+    try:
+        if QApplication.instance() is None:
+            # Create a temporary app to test if we can
+            QApplication([])
+        return True
+    except Exception:
+        return False
+
 pytestmark = pytest.mark.skipif(
-    not QApplication.instance() and not hasattr(Qt, 'AA_ShareOpenGLContexts'),
-    reason="GUI tests need a QApplication with a working display"
+    not has_qt_display() or not pytest.importorskip("pytest_qt"),
+    reason="GUI tests require pytest-qt and a working display"
 )
 
 

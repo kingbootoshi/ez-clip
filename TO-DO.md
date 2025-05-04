@@ -12,7 +12,7 @@
     
     - We should be able to correct individual words as well (which will then edit the segment + transcript)~~ (DONE)
 
-2. once we have the above, then i want to be able to have the media be displayed on the top left (where it says select media file)
+~~2. once we have the above, then i want to be able to have the media be displayed on the top left (where it says select media file)
     - if we already processed the transcript, since we save the location of the media, as long as it doesn't move then just load it in from our file system (otherwise, fall back, allow us to choose the new location of media if needed, but still display the processed transcript)
 
 - we should be able to have some sort of editor segment that will:
@@ -23,6 +23,8 @@
         and play the edited segments to preview the edit in real time (JUST like descript)
         - perhaps it would be nice if we could even export that edited video + transcript + segment/word level timestamped directions that allow our editors to find it themselves and clip it
 
+        ultimately the goal is, we CANNOT alter the words of the clip, but because we track words on a timestamped level basis, we should be able to edit videos simply by deleting words, splicing segments together, even splicing words together, to create clips that make sense. just like descript~~ (DONE)
+
 3. finally we need a chat part of the GUI, where we can select a video transcript we processed from the library. then open the chat interface
 this chat interface should:
     - The system prompt should be a preset one we create that CLEARLY defines the rules of: 
@@ -31,3 +33,7 @@ this chat interface should:
     - Allow us to select the model
     - Allow us to open different chat history/tabs to switch between attached to that specific video
     - Allow us to edit/delete chat history
+
+bug fixes
+- there's no way to upload new media when we select a media thats in the playback, simple gui fix
+- we need to track empty space as well
