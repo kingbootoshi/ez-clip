@@ -22,8 +22,7 @@ jobs:
 
       - name: Install deps
         run: |
-          pip install -r ez_clip_app/requirements.txt
-          pip install pytest pytest-cov
+          pip install -r requirements-dev.txt 
 
       - name: Run fast tests + coverage
         run: |
