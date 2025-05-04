@@ -1,4 +1,4 @@
-# EZ CLIP Transcription
+# EZ CLIP
 
 <div align="center">
 
@@ -119,5 +119,5 @@ For more details, see our [Contributing Guide](docs/contributing.md).
 ---
 
 <div align="center">
-  <sub>Built with ❤️ by [Your Name/Organization]</sub>
+  <sub>Built with ❤️ by Bootoshi of [Agency42](https://www.agency42.co/)</sub>
 </div>

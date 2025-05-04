@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QRunnable, QThreadPool, QUrl
 from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtGui import QIcon
+from ez_clip_app.assets import ezclip_rc  # noqa: F401
 
 from ..config import (
     DEFAULT_MODEL_SIZE, DEFAULT_LANGUAGE, DEFAULT_MIN_SPEAKERS,
@@ -103,8 +104,13 @@ class MainWindow(QMainWindow):
         self.current_media_id = None
         
         # Tray icon (needed for showMessage on mac/Win)
-        self.tray = QSystemTrayIcon(QIcon(), self)  # empty icon is fine
+        self.tray = QSystemTrayIcon(self)
+        self.tray.setIcon(QIcon(":/ezclip_icon"))
+        self.tray.setToolTip("EZ CLIP – ready")
         self.tray.setVisible(True)
+        
+        # Window-level icon (makes sure even secondary windows carry it)
+        self.setWindowIcon(QIcon(":/ezclip_icon"))
         
         # Preload chime
         mp3_path = str(pkg_res.files("ez_clip_app.assets") / "finish.wav")
@@ -117,7 +123,7 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         """Initialize the user interface."""
-        self.setWindowTitle("EZ Clip")
+        self.setWindowTitle("EZ CLIP")
         self.setMinimumSize(800, 600)
         
         # Main widget and layout

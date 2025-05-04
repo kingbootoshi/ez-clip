@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <!-- alias lets us refer to it as ':/ezclip_icon' everywhere -->
+    <file alias="ezclip_icon">ezclip_icon.png</file>
+  </qresource>
+</RCC>

@@ -8,7 +8,9 @@ import argparse
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QIcon
 from ez_clip_app.ui.desktop_gui import MainWindow
+from ez_clip_app.assets import ezclip_rc  # noqa: F401  (ensure resource import)
 
 # Configure logging
 def setup_logging(verbose=False):
@@ -43,6 +45,14 @@ def main():
     logger.info("Starting WhisperXtranscription application")
     
     app = QApplication(sys.argv)
+    
+    # Set application name (visible in menu-bar, Dock tooltip, etc.)
+    app.setApplicationDisplayName("EZ CLIP")
+    app.setApplicationName("EZ CLIP")
+    
+    # Set global app icon (visible in task-switcher, Dock, etc.)
+    app.setWindowIcon(QIcon(":/ezclip_icon"))
+    
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
