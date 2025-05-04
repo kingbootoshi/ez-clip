@@ -351,6 +351,9 @@ class DB:
     def delete_media(self, media_id: int):
         """Completely remove a media file and all its associated data."""
         with self._get_connection() as conn:
+            # Delete speakers explicitly (belt and suspenders, normally handled by cascade)
+            conn.execute("DELETE FROM speakers WHERE media_id = ?", (media_id,))
+            # This will cascade delete related transcripts, segments, and words
             conn.execute("DELETE FROM media_files WHERE id = ?", (media_id,))
             
     def get_words_by_segment(self, segment_id: int) -> t.List[sqlite3.Row]:

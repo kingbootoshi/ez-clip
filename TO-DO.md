@@ -1,4 +1,4 @@
-1. we have full transcript and segments. but segments don't give us word level timestamps, which we'll need for editing
+~~1. we have full transcript and segments. but segments don't give us word level timestamps, which we'll need for editing
 
     - create another tab + sql schema DB structure for word level timestamps
 
@@ -10,7 +10,7 @@
         their focus should be not on trying to figure out how to make the clip make sense, but to take a clip that already makes sense
         and make it much more entertaining and engaging
     
-    - We should be able to correct individual words as well (which will then edit the segment + transcript)
+    - We should be able to correct individual words as well (which will then edit the segment + transcript)~~ (DONE)
 
 2. once we have the above, then i want to be able to have the media be displayed on the top left (where it says select media file)
     - if we already processed the transcript, since we save the location of the media, as long as it doesn't move then just load it in from our file system (otherwise, fall back, allow us to choose the new location of media if needed, but still display the processed transcript)
