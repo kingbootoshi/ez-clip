@@ -2,7 +2,6 @@
 SQLite database helpers for the WhisperX transcription app.
 """
 import sqlite3
-import json
 import pathlib
 import contextlib
 import typing as t
@@ -23,6 +22,13 @@ class DB:
             db_path: Path to SQLite database. Can be ":memory:" for in-memory testing.
         """
         self.db_path = Path(db_path)
+        
+        # ALPHA VERSION ONLY: Delete old DB to avoid schema conflicts
+        # Remove this later when moving out of early alpha
+        if self.db_path.exists() and str(self.db_path) != ":memory:":
+            logger.warning(f"Alpha version: Purging old DB at {self.db_path}")
+            self.db_path.unlink()
+            
         self._ensure_tables()
     
     def _get_connection(self) -> sqlite3.Connection:
@@ -136,14 +142,12 @@ class DB:
             
             # Iterate through the provided segments and insert each one
             for segment in segments:
-                # Serialize the 'words' list (if present) into JSON for storage
-                words_json = json.dumps(segment.get("words", []))
-                # Execute the INSERT statement for the segment
-                conn.execute(
+                # Insert the segment and get its ID
+                cur = conn.execute(
                     """
                     INSERT INTO segments(
-                        media_id, speaker, start_sec, end_sec, text, words_json
-                    ) VALUES(?, ?, ?, ?, ?, ?)
+                        media_id, speaker, start_sec, end_sec, text
+                    ) VALUES(?, ?, ?, ?, ?)
                     """,
                     (
                         media_id,
@@ -152,9 +156,24 @@ class DB:
                         segment["start"], # Start time of the segment
                         segment["end"],   # End time of the segment
                         segment["text"],  # Text content of the segment
-                        words_json        # JSON string of word timings
                     )
                 )
+                segment_id = cur.lastrowid
+                
+                # Insert words with segment_id FK
+                for w in segment.get("words", []):
+                    conn.execute(
+                        """INSERT INTO words
+                           (segment_id, text, start_sec, end_sec, score)
+                           VALUES (?,?,?,?,?)""",
+                        (
+                            segment_id,                    # FK to segments table
+                            w["word"],
+                            float(w["start"]),
+                            float(w["end"]),
+                            float(w.get("score", 0)),
+                        ),
+                    )
             
             # Return the ID of the main transcript record
             return transcript_id
@@ -211,13 +230,17 @@ class DB:
                 (media_id,)
             ).fetchall()
             
-            # Convert rows to dictionaries and parse words_json
+            # Convert rows to dictionaries and fetch associated words
             segments_list = []
             for seg in segments:
-                segment_dict = dict(seg)
-                if segment_dict["words_json"]:
-                    segment_dict["words"] = json.loads(segment_dict["words_json"])
-                segments_list.append(segment_dict)
+                seg_dict = dict(seg)              # sqlite Row → dict
+                # fetch words for this segment_id
+                seg_words = conn.execute(
+                    "SELECT * FROM words WHERE segment_id=? ORDER BY start_sec",
+                    (seg_dict["id"],)
+                ).fetchall()
+                seg_dict["words"] = [dict(w) for w in seg_words]
+                segments_list.append(seg_dict)
             
             return {
                 "transcript": dict(transcript),
@@ -317,3 +340,75 @@ class DB:
         """Completely remove a media file and all its associated data."""
         with self._get_connection() as conn:
             conn.execute("DELETE FROM media_files WHERE id = ?", (media_id,))
+            
+    def get_words_by_segment(self, segment_id: int) -> t.List[sqlite3.Row]:
+        """Get words for a specific segment.
+        
+        Args:
+            segment_id: Segment ID
+            
+        Returns:
+            List of word rows sorted by start time
+        """
+        with self._get_connection() as conn:
+            return conn.execute(
+                "SELECT * FROM words WHERE segment_id=? ORDER BY start_sec",
+                (segment_id,)
+            ).fetchall()
+
+    def update_word(self, segment_id: int, word_id: int, new_text: str):
+        """Patch a single word & cascade text updates.
+        
+        Args:
+            segment_id: Segment ID
+            word_id: Word ID
+            new_text: New word text
+        """
+        with self._get_connection() as conn:
+            # Update the word text
+            conn.execute(
+                "UPDATE words SET text=? WHERE id=? AND segment_id=?", 
+                (new_text, word_id, segment_id)
+            )
+            
+            # Get the media_id from the segment
+            row = conn.execute(
+                "SELECT media_id FROM segments WHERE id=?", 
+                (segment_id,)
+            ).fetchone()
+            
+            if not row:
+                return  # Segment not found
+                
+            media_id = row["media_id"]
+            
+            # Rebuild segment.text from all its words
+            words = conn.execute(
+                "SELECT text FROM words WHERE segment_id=? ORDER BY start_sec", 
+                (segment_id,)
+            ).fetchall()
+            
+            sentence = " ".join(w["text"] for w in words)
+            conn.execute(
+                "UPDATE segments SET text=? WHERE id=?",
+                (sentence, segment_id)
+            )
+            
+        # Finally regenerate full transcript via formatting util
+        self._regenerate_full_text(media_id)
+
+    def _regenerate_full_text(self, media_id: int):
+        """Regenerate full markdown transcript from segments.
+        
+        Args:
+            media_id: Media file ID
+        """
+        segs = self.get_transcript(media_id)["segments"]
+        speaker_map = self.get_speaker_map(media_id)
+        from ez_clip_app.core.formatting import segments_to_markdown
+        new_md = segments_to_markdown(segs, speaker_map)
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE transcripts SET full_text=? WHERE media_id=?",
+                (new_md, media_id)
+            )

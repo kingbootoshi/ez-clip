@@ -222,9 +222,22 @@ class MainWindow(QMainWindow):
         self.segments_table.cellDoubleClicked.connect(self.prompt_rename)
         segments_layout.addWidget(self.segments_table)
         
+        # Words tab – shows the words of the currently selected segment
+        self.words_widget = QWidget()
+        words_layout = QVBoxLayout(self.words_widget)
+        self.words_table = QTableWidget()
+        self.words_table.setColumnCount(4)
+        self.words_table.setHorizontalHeaderLabels(
+            ["Word", "Start", "End", "Score"]
+        )
+        self.words_table.horizontalHeader().setStretchLastSection(True)
+        self.words_table.cellDoubleClicked.connect(self.edit_word)
+        words_layout.addWidget(self.words_table)
+        
         # Add tabs
         self.results_tabs.addTab(self.transcript_widget, "Full Transcript")
         self.results_tabs.addTab(self.segments_widget, "Segments")
+        self.results_tabs.addTab(self.words_widget, "Words")
         
         # Add results_tabs to the splitter
         splitter.addWidget(self.results_tabs)
@@ -512,10 +525,15 @@ class MainWindow(QMainWindow):
         self.segments_table.setRowCount(len(segments))
         
         for i, segment in enumerate(segments):
+            # Get segment ID and store it for later use
+            seg_id = segment["id"]
+            
             # Speaker (use friendly name if available)
             speaker_id = segment["speaker"]
             display_name = speaker_map.get(speaker_id, speaker_id)
             speaker_item = QTableWidgetItem(display_name)
+            # Store segment_id in UserRole data
+            speaker_item.setData(Qt.UserRole, seg_id)
             self.segments_table.setItem(i, 0, speaker_item)
             
             # Start time (format as MM:SS.ms)
@@ -536,9 +554,72 @@ class MainWindow(QMainWindow):
         
         self.segments_table.resizeColumnsToContents()
         
+        # Connect segment selection to word loading
+        self.segments_table.cellClicked.connect(self.load_words_for_segment)
+        
         # Clean up UI for completed job
         if job_id in self.active_jobs:
             job_widget = self.active_jobs[job_id]['widget']
             self.jobs_layout.removeWidget(job_widget)
             job_widget.deleteLater()
             del self.active_jobs[job_id]
+            
+    def load_words_for_segment(self, row, _col):
+        """Load words for the selected segment.
+        
+        Args:
+            row: The selected row index
+            _col: The selected column index (ignored)
+        """
+        # Get segment_id from the UserRole data
+        seg_item = self.segments_table.item(row, 0)
+        segment_id = seg_item.data(Qt.UserRole)
+        
+        # Get words using segment_id
+        words = self.db.get_words_by_segment(segment_id)
+        
+        self.words_table.setRowCount(len(words))
+        for i, w in enumerate(words):
+            word_item = QTableWidgetItem(w["text"])
+            # Store word id in UserRole data for editing
+            word_item.setData(Qt.UserRole, w["id"])
+            self.words_table.setItem(i, 0, word_item)
+            
+            self.words_table.setItem(i, 1, QTableWidgetItem(f"{w['start_sec']:.2f}"))
+            self.words_table.setItem(i, 2, QTableWidgetItem(f"{w['end_sec']:.2f}"))
+            self.words_table.setItem(i, 3, QTableWidgetItem(f"{w['score']:.2f}"))
+        self.words_table.resizeColumnsToContents()
+        
+    def edit_word(self, row, col):
+        """Handle word editing.
+        
+        Args:
+            row: The selected row index
+            col: The selected column index
+        """
+        if col != 0:   # only text column editable
+            return
+            
+        # Get the current segment row
+        seg_row = self.segments_table.currentRow()
+        
+        # Get segment_id from the UserRole data
+        seg_item = self.segments_table.item(seg_row, 0)
+        segment_id = seg_item.data(Qt.UserRole)
+        
+        # Get word_id from the UserRole data
+        word_item = self.words_table.item(row, 0)
+        word_id = word_item.data(Qt.UserRole)
+        
+        # Get old text and prompt for new text
+        old = word_item.text()
+        new, ok = QInputDialog.getText(self, "Edit Word", "Correct word:", text=old)
+        if not ok or new.strip() == old:
+            return
+            
+        # Update DB with new text
+        self.db.update_word(segment_id, word_id, new.strip())
+        
+        # Reload panes
+        self.display_transcript(self.current_media_id)
+        self.load_words_for_segment(seg_row, 0)

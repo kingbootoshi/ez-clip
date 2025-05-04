@@ -134,6 +134,9 @@ def process_file(
             progress_cb(90)
             db.update_progress(job_id, 90)
         
+        # Ensure segments are sorted by start time
+        segments.sort(key=lambda s: s["start"])
+        
         # Get speaker map from database (may be empty)
         speaker_map = db.get_speaker_map(job_id)
         
