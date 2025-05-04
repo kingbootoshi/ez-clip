@@ -24,14 +24,16 @@ jobs:
         run: |
           # Install Qt dependencies for CI
           sudo apt-get update -qq
-          sudo apt-get install -qq -y libgl1-mesa-glx
+          sudo apt-get install -qq -y libgl1 libegl1 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 xvfb
           # Install Python dependencies
           pip install -r requirements-dev.txt
           pip install pytest-qt
 
       - name: Run fast tests + coverage
+        # Run with Xvfb as a virtual display for GUI tests (if we ever want to enable them)
         run: |
-          pytest -m "not integration and not slow" \
+          # Run with explicit marker exclusions (-m "not X and not Y")
+          xvfb-run --auto-servernum pytest -m "not integration and not slow and not gui" \
                  --cov=ez_clip_app \
                  --cov-report=xml \
                  --cov-report=term

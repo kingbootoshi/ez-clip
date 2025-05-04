@@ -37,3 +37,7 @@ this chat interface should:
 bug fixes
 - there's no way to upload new media when we select a media thats in the playback, simple gui fix
 - we need to track empty space as well
+
+## Testing & CI
+- Qt-related GUI tests now skipped in CI but can be run locally with pytest-qt
+- Fixed Word model tests to adapt to the new 0.0 default score value
