@@ -5,6 +5,8 @@ import sys
 import logging
 import threading
 import typing as t
+import tempfile
+import json
 from pathlib import Path
 from collections import deque
 import importlib.resources as pkg_res
@@ -15,11 +17,12 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QProgressBar, QFileDialog, QComboBox,
     QCheckBox, QSpinBox, QTextEdit, QTableWidget, QTableWidgetItem,
     QTabWidget, QGroupBox, QFormLayout, QMessageBox, QSplitter,
-    QListWidget, QListWidgetItem, QInputDialog, QSystemTrayIcon
+    QListWidget, QListWidgetItem, QInputDialog, QSystemTrayIcon,
+    QStackedWidget
 )
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtCore import QRunnable, QThreadPool, QUrl
 from PySide6.QtMultimedia import QSoundEffect
-from PySide6.QtGui import QIcon
 from ez_clip_app.assets import ezclip_rc  # noqa: F401
 
 from ..config import (
@@ -31,7 +34,11 @@ from ..data.database import DB
 from ..core.pipeline import process_file, JobSettings, PipelineError
 from ..core.formatting import segments_to_markdown
 from ..core.models import Segment, Word, TranscriptionResult
+from ..core import EditMask, PreviewRebuilder
+from ..core.video_edit import extract_clip, concat_clips
 from ..ui.player_widget import PlayerWidget
+from ..ui.media_pane import MediaPane
+from ..ui.word_toggle_view import WordToggleView
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -90,6 +97,13 @@ class MainWindow(QMainWindow):
         self.job_queue = deque()
         self.job_running = False
         
+        # Create media pane with player and transport controls
+        self.mediaPane = MediaPane()
+        self.mediaPane.positionChanged.connect(self.on_player_position_changed)
+        
+        # Create preview rebuilder (still connected to the player inside mediaPane)
+        self.preview_rebuilder = PreviewRebuilder(self.mediaPane.player)
+        
         # Set up the UI
         self.init_ui()
         
@@ -128,6 +142,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("EZ CLIP")
         self.setMinimumSize(800, 600)
         
+        # Add menu bar
+        menubar = self.menuBar()
+        file_menu = menubar.addMenu("File")
+        
+        # Export action
+        export_action = QAction("Export Clip...", self)
+        export_action.triggered.connect(self.on_export_clip)
+        file_menu.addAction(export_action)
+        
         # Main widget and layout
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
@@ -136,10 +159,19 @@ class MainWindow(QMainWindow):
         top_panel = QWidget()
         top_layout = QHBoxLayout(top_panel)
         
-        # File selection button
+        # Header stacked widget - contains either select button or player
+        self.headerStack = QStackedWidget()
+        
+        # Page 0: File selection button
         self.select_file_btn = QPushButton("Select Media File")
         self.select_file_btn.clicked.connect(self.on_select_file)
-        top_layout.addWidget(self.select_file_btn)
+        self.headerStack.addWidget(self.select_file_btn)
+        
+        # Page 1: Media pane with player and transport controls (already created in __init__)
+        self.headerStack.addWidget(self.mediaPane)
+        
+        # Add the stacked widget to top layout
+        top_layout.addWidget(self.headerStack)
         
         # Settings group
         settings_group = QGroupBox("Transcription Settings")
@@ -192,12 +224,7 @@ class MainWindow(QMainWindow):
         # Bottom section - Library and Results in a splitter
         splitter = QSplitter(Qt.Horizontal)
         
-        # Player column (top-left)
-        self.player = PlayerWidget()
-        player_frame = QWidget()
-        pf_layout = QVBoxLayout(player_frame)
-        pf_layout.setContentsMargins(0, 0, 0, 0)
-        pf_layout.addWidget(self.player)
+        # Player has been moved to the headerStack
         
         # Library sidebar on the left
         self.library = QListWidget()
@@ -213,9 +240,8 @@ class MainWindow(QMainWindow):
         left_container = QWidget()
         left_container.setLayout(left_col)
         
-        # Build left-hand splitter: player over library
+        # Build left-hand splitter: library only (player moved to headerStack)
         left_split = QSplitter(Qt.Vertical)
-        left_split.addWidget(player_frame)
         left_split.addWidget(left_container)
         splitter.insertWidget(0, left_split)
         
@@ -256,10 +282,19 @@ class MainWindow(QMainWindow):
         self.words_table.cellClicked.connect(self.on_word_clicked)
         words_layout.addWidget(self.words_table)
         
+        # Editor tab for word-level editing
+        self.editor_widget = QWidget()
+        editor_layout = QVBoxLayout(self.editor_widget)
+        
+        self.word_toggle_view = WordToggleView()
+        self.word_toggle_view.wordToggled.connect(self.on_word_toggled)
+        editor_layout.addWidget(self.word_toggle_view)
+        
         # Add tabs
         self.results_tabs.addTab(self.transcript_widget, "Full Transcript")
         self.results_tabs.addTab(self.segments_widget, "Segments")
         self.results_tabs.addTab(self.words_widget, "Words")
+        self.results_tabs.addTab(self.editor_widget, "Editor")
         
         # Connect tab change signal to auto-select first row when Words tab is selected
         self.results_tabs.currentChanged.connect(self.on_tab_changed)
@@ -599,6 +634,22 @@ class MainWindow(QMainWindow):
             self.segments_table.selectRow(0)
             self.load_words_for_segment(0, 0)
         
+        # Initialize the edit mask
+        all_words = []
+        for segment in result.segments:
+            for word in segment.words:
+                # Words already have speaker information from DB
+                all_words.append(word)
+                
+        # Get or create edit mask
+        self.edit_mask = self.db.get_edit_mask(job_id)
+        if not self.edit_mask:
+            self.edit_mask = EditMask(job_id, [True] * len(all_words))
+            
+        # Update the editor view
+        self.word_toggle_view.set_words(all_words)
+        self.word_toggle_view.set_mask(self.edit_mask)
+        
         # Clean up UI for completed job
         if job_id in self.active_jobs:
             job_widget = self.active_jobs[job_id]['widget']
@@ -608,8 +659,33 @@ class MainWindow(QMainWindow):
             
         # Auto-load media in player if available
         media_path = self.db.get_media_path(job_id)
-        if media_path and Path(media_path).exists():
-            self.player.load(Path(media_path))
+        if media_path:
+            media_path_obj = Path(media_path)
+            if media_path_obj.exists():
+                self.mediaPane.load(media_path_obj)
+                self.headerStack.setCurrentIndex(1)  # Switch to player view
+            else:
+                # Prompt for new path if file doesn't exist
+                msg_box = QMessageBox()
+                msg_box.setIcon(QMessageBox.Warning)
+                msg_box.setText(f"Media file not found: {media_path}")
+                msg_box.setInformativeText("Would you like to locate it?")
+                msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                msg_box.setDefaultButton(QMessageBox.Yes)
+                
+                if msg_box.exec() == QMessageBox.Yes:
+                    file_dialog = QFileDialog()
+                    new_path, _ = file_dialog.getOpenFileName(
+                        self,
+                        "Locate Media File",
+                        str(Path.home()),
+                        "Media Files (*.mp4 *.mp3 *.wav *.avi *.mkv *.m4a *.flac);;All Files (*)"
+                    )
+                    
+                    if new_path:
+                        self.db.update_media_path(job_id, new_path)
+                        self.mediaPane.load(Path(new_path))
+                        self.headerStack.setCurrentIndex(1)  # Switch to player view
             
     def load_words_for_segment(self, row, _col):
         """Load words for the selected segment.
@@ -663,7 +739,7 @@ class MainWindow(QMainWindow):
         seg: Segment = self.db.get_segment(segment_id)
         
         # Seek to the segment start time
-        self.player.seek(seg.start_sec)
+        self.mediaPane.seek(seg.start_sec)
     
     def on_word_clicked(self, row, _col):
         """Seek to the selected word position.
@@ -674,7 +750,7 @@ class MainWindow(QMainWindow):
         """
         # Get start time directly from the table
         start_sec = float(self.words_table.item(row, 1).text())
-        self.player.seek(start_sec)
+        self.mediaPane.seek(start_sec)
             
     def edit_word(self, row, col):
         """Handle word editing.
@@ -712,4 +788,212 @@ class MainWindow(QMainWindow):
         
         # Reload panes
         self.display_transcript(self.current_media_id)
-        self.load_words_for_segment(seg_row, 0)
+    
+    def on_player_position_changed(self, position: float):
+        """Update the last playback position in the database.
+        
+        Args:
+            position: Position in seconds
+        """
+        if self.current_media_id:
+            # Only update every few seconds to avoid excessive DB writes
+            # Could also use a timer-based debounce here
+            if int(position) % 5 == 0:  # Every 5 seconds
+                self.db.update_media_last_pos(self.current_media_id, position)
+    
+    def on_word_toggled(self, index: int, keep: bool):
+        """Handle word toggle events from the editor.
+        
+        Args:
+            index: Index of the toggled word
+            keep: New keep state (True = keep, False = cut)
+        """
+        if not self.current_media_id or not hasattr(self, 'edit_mask'):
+            return
+            
+        # Update the mask
+        self.edit_mask.keep[index] = keep
+        
+        # Save to database
+        self.db.save_edit_mask(self.edit_mask)
+        
+        # Trigger preview rebuild
+        self.schedule_preview_rebuild()
+        
+    def schedule_preview_rebuild(self):
+        """Schedule a preview rebuild after a short delay."""
+        if not hasattr(self, 'edit_mask') or not self.current_media_id:
+            return
+            
+        # Get all words
+        all_words = []
+        result = self.db.get_transcript(self.current_media_id)
+        if not result:
+            return
+            
+        for segment in result.segments:
+            for word in segment.words:
+                all_words.append(word)
+                
+        # Get media path
+        media_path = self.db.get_media_path(self.current_media_id)
+        if not media_path or not Path(media_path).exists():
+            return
+            
+        # Schedule the rebuild
+        self.preview_rebuilder.schedule(self.edit_mask, all_words, media_path)
+    
+    def on_export_clip(self):
+        """Handle export clip action."""
+        if not hasattr(self, 'edit_mask') or not self.current_media_id:
+            QMessageBox.warning(
+                self,
+                "Export Error",
+                "No media loaded or no edit mask available."
+            )
+            return
+        
+        # Open file dialog for destination
+        file_dialog = QFileDialog()
+        dest_path, _ = file_dialog.getSaveFileName(
+            self,
+            "Export Edited Clip",
+            str(Path.home()),
+            "MP4 Video (*.mp4);;All Files (*)"
+        )
+        
+        if not dest_path:
+            return
+            
+        # Add default extension if not provided
+        dest_path = Path(dest_path)
+        if not dest_path.suffix:
+            dest_path = dest_path.with_suffix('.mp4')
+            
+        # Start export
+        try:
+            self.export_current(dest_path)
+            QMessageBox.information(
+                self,
+                "Export Complete",
+                f"Exported clip to {dest_path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Export Error",
+                f"Failed to export: {str(e)}"
+            )
+    
+    def export_current(self, dest_path: Path):
+        """Export the current edit to the specified destination.
+        
+        Args:
+            dest_path: Path where the edited clip should be saved
+        """
+        # Get all words and transcript result
+        result = self.db.get_transcript(self.current_media_id)
+        if not result:
+            raise ValueError("No transcript found")
+            
+        all_words = []
+        for segment in result.segments:
+            for word in segment.words:
+                all_words.append(word)
+                
+        # Ensure we have an edit mask
+        if not hasattr(self, 'edit_mask'):
+            raise ValueError("No edit mask available")
+            
+        # Get source media path
+        media_path = self.db.get_media_path(self.current_media_id)
+        if not media_path or not Path(media_path).exists():
+            raise ValueError(f"Media file not found: {media_path}")
+            
+        # Calculate time ranges
+        ranges = self.edit_mask.build_ranges(all_words)
+        
+        # Use temporary directory for intermediate clips
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            clips = []
+            
+            # Extract each clip
+            for i, (start, end) in enumerate(ranges):
+                clip_path = tmp_path / f"{i:03d}.mp4"
+                clips.append(clip_path)
+                extract_clip(Path(media_path), clip_path, start, end)
+                
+            # Concatenate all clips
+            if clips:
+                concat_clips(clips, dest_path)
+            else:
+                raise ValueError("No clip ranges to export")
+                
+        # Build edited SRT file
+        kept_words = [w for w, k in zip(all_words, self.edit_mask.keep) if k]
+        if kept_words:
+            self._write_srt(kept_words, dest_path.with_suffix('.srt'))
+            
+        # Export ranges to JSON
+        json_path = dest_path.with_suffix('.json')
+        with open(json_path, 'w') as f:
+            json.dump({
+                "media_id": self.current_media_id,
+                "ranges": ranges,
+                "total_words": len(all_words),
+                "kept_words": sum(self.edit_mask.keep)
+            }, f, indent=2)
+    
+    def _write_srt(self, kept_words, srt_path):
+        """Write an SRT file with the kept words.
+        
+        Args:
+            kept_words: List of Word objects that were kept
+            srt_path: Path where the SRT file should be saved
+        """
+        if not kept_words:
+            return
+            
+        with open(srt_path, 'w') as f:
+            # Group words into sentences
+            groups = []
+            current_group = []
+            last_end = 0
+            
+            for word in kept_words:
+                # If there's a gap of more than 1 second, start new group
+                if current_group and (word.s - last_end) > 1.0:
+                    groups.append(current_group)
+                    current_group = []
+                
+                current_group.append(word)
+                last_end = word.e
+                
+            # Add the last group
+            if current_group:
+                groups.append(current_group)
+                
+            # Write SRT entries
+            for i, group in enumerate(groups):
+                # Calculate start/end times
+                start = group[0].s
+                end = group[-1].e
+                
+                # Format timestamps for SRT (HH:MM:SS,mmm)
+                start_h = int(start // 3600)
+                start_m = int((start % 3600) // 60)
+                start_s = int(start % 60)
+                start_ms = int((start % 1) * 1000)
+                
+                end_h = int(end // 3600)
+                end_m = int((end % 3600) // 60)
+                end_s = int(end % 60)
+                end_ms = int((end % 1) * 1000)
+                
+                # Write entry
+                f.write(f"{i+1}\n")
+                f.write(f"{start_h:02d}:{start_m:02d}:{start_s:02d},{start_ms:03d} --> ")
+                f.write(f"{end_h:02d}:{end_m:02d}:{end_s:02d},{end_ms:03d}\n")
+                f.write(" ".join(w.w for w in group))
+                f.write("\n\n")

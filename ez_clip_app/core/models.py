@@ -8,19 +8,24 @@ from pydantic import BaseModel, ConfigDict
 
 
 class Word(BaseModel):
-    """Word model representing individual words in a transcription segment.
+    """Single token with timing-info + (optional) speaker label.
     
     Attributes:
-        w: The word text
-        s: Start time in seconds
-        e: End time in seconds
+        w: The word text (surface form)
+        s: Start time in seconds (start-sec)
+        e: End time in seconds (end-sec)
         score: Confidence score (0-1) for the word, optional
+        speaker: Speaker identifier, optional
     """
     w: str
     s: float  # start_sec
     e: float  # end_sec
-    score: float | None = None
-    model_config = ConfigDict(extra='ignore')  # tolerate unknown keys
+    score: float = 0.0
+    speaker: str | None = None  # NEW — populated by DB
+    model_config = ConfigDict(
+        extra='ignore',          # tolerate unknown keys at parse-time
+        validate_assignment=True # allow mutability for *declared* attrs
+    )
 
 
 class Segment(BaseModel):

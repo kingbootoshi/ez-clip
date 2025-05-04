@@ -2,9 +2,22 @@
 Player widget for video and audio playback in the EZ CLIP app.
 """
 from pathlib import Path
-from PySide6.QtCore import Qt, Signal, QUrl
+from PySide6.QtCore import Qt, Signal, QUrl, QObject
 from PySide6.QtWidgets import QWidget, QVBoxLayout
-from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+# Import with compatibility for older/newer PySide6 versions
+try:
+    from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+except ImportError:
+    from PySide6.QtMultimedia import QMediaPlayer
+    # In newer PySide6, QAudioOutput might be in a different location
+    try:
+        from PySide6.QtMultimedia import QAudioOutput
+    except ImportError:
+        # Create a placeholder if not available
+        class QAudioOutput(QObject):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                
 from PySide6.QtMultimediaWidgets import QVideoWidget
 
 
@@ -48,7 +61,18 @@ class PlayerWidget(QWidget):
         Args:
             path: Path to media file
         """
-        self.player.setSource(QUrl.fromLocalFile(str(path)))
+        try:
+            # In newer PySide6 versions
+            self.player.setSource(QUrl.fromLocalFile(str(path)))
+        except AttributeError:
+            # In older PySide6 versions
+            try:
+                self.player.setMedia(QUrl.fromLocalFile(str(path)))
+            except AttributeError:
+                # If both fail, log an error
+                print(f"Error loading media: {path}")
+                return
+                
         self.player.pause()  # Load but don't play initially
     
     def seek(self, sec: float):

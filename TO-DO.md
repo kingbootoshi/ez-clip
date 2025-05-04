@@ -21,7 +21,7 @@
     c. when we click on words, take us to that exact level in the timestamp
     d. an editor that allows us to splice/combine different segments (whether it's in the past or in the future relative to the current timestamp),
         and play the edited segments to preview the edit in real time (JUST like descript)
-        - perhaps it would be nice if we could even export that edited video + transcript + segment/word level timestamped directions that allow our editors to find it themselves and clip it, if the edit isn't good
+        - perhaps it would be nice if we could even export that edited video + transcript + segment/word level timestamped directions that allow our editors to find it themselves and clip it
 
 3. finally we need a chat part of the GUI, where we can select a video transcript we processed from the library. then open the chat interface
 this chat interface should:

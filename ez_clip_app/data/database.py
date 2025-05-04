@@ -10,6 +10,7 @@ import logging
 
 from ez_clip_app.config import DB_PATH, Status
 from ez_clip_app.core.models import Segment, Word, TranscriptionResult
+from ez_clip_app.core import EditMask
 from pydantic import TypeAdapter
 
 logger = logging.getLogger(__name__)
@@ -261,7 +262,8 @@ class DB:
                         "w": word_dict["text"],
                         "s": word_dict["start_sec"],
                         "e": word_dict["end_sec"],
-                        "score": word_dict["score"]
+                        "score": word_dict["score"],
+                        "speaker": seg_dict["speaker"]  # NEW - pass speaker from segment
                     })
                     word_models.append(word)
                 
@@ -413,7 +415,8 @@ class DB:
                     "w": word_dict["text"],
                     "s": word_dict["start_sec"],
                     "e": word_dict["end_sec"],
-                    "score": word_dict["score"]
+                    "score": word_dict["score"],
+                    "speaker": dict(row)["speaker"]  # NEW - pass speaker from segment
                 })
                 word_models.append(word)
             
@@ -508,4 +511,72 @@ class DB:
             conn.execute(
                 "UPDATE transcripts SET full_text=? WHERE media_id=?",
                 (new_md, media_id)
+            )
+    
+    def get_edit_mask(self, media_id: int) -> "EditMask | None":
+        """Get the edit mask for a media file.
+        
+        Args:
+            media_id: Media file ID
+            
+        Returns:
+            EditMask object or None if not found
+        """
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT mask_json FROM edit_masks WHERE media_id = ?",
+                (media_id,)
+            ).fetchone()
+            
+            if not row:
+                return None
+                
+            # Get total words count to initialize the mask
+            result = self.get_transcript(media_id)
+            if not result:
+                return None
+                
+            total_words = sum(len(seg.words) for seg in result.segments)
+            
+            return EditMask.loads(media_id, row["mask_json"], total_words)
+    
+    def save_edit_mask(self, mask: EditMask) -> None:
+        """Save an edit mask to the database.
+        
+        Args:
+            mask: EditMask object to save
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO edit_masks(media_id, mask_json) 
+                VALUES(?, ?)
+                """,
+                (mask.media_id, mask.dumps())
+            )
+    
+    def update_media_last_pos(self, media_id: int, pos: float) -> None:
+        """Update the last playback position of a media file.
+        
+        Args:
+            media_id: Media file ID
+            pos: Position in seconds
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE media_files SET last_pos = ? WHERE id = ?",
+                (pos, media_id)
+            )
+    
+    def update_media_path(self, media_id: int, new_path: str) -> None:
+        """Update the file path of a media file.
+        
+        Args:
+            media_id: Media file ID
+            new_path: New file path
+        """
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE media_files SET filepath = ? WHERE id = ?",
+                (new_path, media_id)
             )

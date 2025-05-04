@@ -5,7 +5,8 @@ CREATE TABLE media_files (
     added_at  TEXT DEFAULT CURRENT_TIMESTAMP,
     status    TEXT DEFAULT 'queued',
     progress  REAL DEFAULT 0,
-    error_msg TEXT
+    error_msg TEXT,
+    last_pos  REAL DEFAULT 0
 );
 
 -- ---------- TRANSCRIPTS ----------
@@ -43,6 +44,12 @@ CREATE TABLE speakers (
     speaker  TEXT,
     name     TEXT,
     PRIMARY KEY(media_id, speaker)
+);
+
+-- ---------- EDIT MASKS ----------
+CREATE TABLE IF NOT EXISTS edit_masks (
+    media_id INTEGER PRIMARY KEY REFERENCES media_files(id) ON DELETE CASCADE,
+    mask_json TEXT NOT NULL              -- {"kind":"mask-v1","remove":[[s,e],...]}
 );
 
 PRAGMA foreign_keys = ON;
