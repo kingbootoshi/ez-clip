@@ -30,6 +30,8 @@ from ..config import (
 from ..data.database import DB
 from ..core.pipeline import process_file, JobSettings, PipelineError
 from ..core.formatting import segments_to_markdown
+from ..core.models import Segment, Word, TranscriptionResult
+from ..ui.player_widget import PlayerWidget
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -190,6 +192,13 @@ class MainWindow(QMainWindow):
         # Bottom section - Library and Results in a splitter
         splitter = QSplitter(Qt.Horizontal)
         
+        # Player column (top-left)
+        self.player = PlayerWidget()
+        player_frame = QWidget()
+        pf_layout = QVBoxLayout(player_frame)
+        pf_layout.setContentsMargins(0, 0, 0, 0)
+        pf_layout.addWidget(self.player)
+        
         # Library sidebar on the left
         self.library = QListWidget()
         self.library.setMinimumWidth(200)
@@ -203,7 +212,12 @@ class MainWindow(QMainWindow):
         left_col.addWidget(self.delete_btn, 0)
         left_container = QWidget()
         left_container.setLayout(left_col)
-        splitter.addWidget(left_container)   # add container instead of just library
+        
+        # Build left-hand splitter: player over library
+        left_split = QSplitter(Qt.Vertical)
+        left_split.addWidget(player_frame)
+        left_split.addWidget(left_container)
+        splitter.insertWidget(0, left_split)
         
         # Results tabs on the right
         self.results_tabs = QTabWidget()
@@ -224,8 +238,9 @@ class MainWindow(QMainWindow):
         self.segments_table.setColumnCount(4)
         self.segments_table.setHorizontalHeaderLabels(["Speaker", "Start", "End", "Text"])
         self.segments_table.horizontalHeader().setStretchLastSection(True)
-        # Connect double-click signal for speaker rename
+        # Connect signals for interaction
         self.segments_table.cellDoubleClicked.connect(self.prompt_rename)
+        self.segments_table.cellClicked.connect(self.on_segment_clicked)
         segments_layout.addWidget(self.segments_table)
         
         # Words tab – shows the words of the currently selected segment
@@ -238,6 +253,7 @@ class MainWindow(QMainWindow):
         )
         self.words_table.horizontalHeader().setStretchLastSection(True)
         self.words_table.cellDoubleClicked.connect(self.edit_word)
+        self.words_table.cellClicked.connect(self.on_word_clicked)
         words_layout.addWidget(self.words_table)
         
         # Add tabs
@@ -506,7 +522,7 @@ class MainWindow(QMainWindow):
     
     def display_transcript(self, job_id):
         """Display transcript and segments for completed job."""
-        result = self.db.get_transcript(job_id)
+        result: TranscriptionResult = self.db.get_transcript(job_id)
         
         if not result:
             logger.warning(f"No transcript found for job {job_id}")
@@ -518,11 +534,23 @@ class MainWindow(QMainWindow):
         # Get speaker map for this media
         speaker_map = self.db.get_speaker_map(job_id)
         
-        # Get segments
-        segments = result["segments"]
+        # Get segments as dicts for formatting (segments_to_markdown expects dicts)
+        segments_dicts = [
+            {
+                "id": seg.id,
+                "speaker": seg.speaker,
+                "start": seg.start_sec,  # Map to expected key for formatter
+                "end": seg.end_sec,      # Map to expected key for formatter
+                "start_sec": seg.start_sec,
+                "end_sec": seg.end_sec,
+                "text": seg.text,
+                "words": [w.model_dump() for w in seg.words]
+            }
+            for seg in result.segments
+        ]
         
         # Always regenerate Markdown with current speaker names
-        regenerated_markdown = segments_to_markdown(segments, speaker_map)
+        regenerated_markdown = segments_to_markdown(segments_dicts, speaker_map)
         
         # Display regenerated transcript
         self.transcript_text.setMarkdown(regenerated_markdown)
@@ -531,14 +559,14 @@ class MainWindow(QMainWindow):
         self.db.update_transcript_text(job_id, regenerated_markdown)
         
         # Display segments in table
-        self.segments_table.setRowCount(len(segments))
+        self.segments_table.setRowCount(len(result.segments))
         
-        for i, segment in enumerate(segments):
+        for i, segment in enumerate(result.segments):
             # Get segment ID and store it for later use
-            seg_id = segment["id"]
+            seg_id = segment.id
             
             # Speaker (use friendly name if available)
-            speaker_id = segment["speaker"]
+            speaker_id = segment.speaker
             display_name = speaker_map.get(speaker_id, speaker_id)
             speaker_item = QTableWidgetItem(display_name)
             # Store segment_id in UserRole data
@@ -546,19 +574,19 @@ class MainWindow(QMainWindow):
             self.segments_table.setItem(i, 0, speaker_item)
             
             # Start time (format as MM:SS.ms)
-            start_secs = segment["start_sec"]
+            start_secs = segment.start_sec
             start_formatted = f"{int(start_secs // 60):02d}:{start_secs % 60:05.2f}"
             start_item = QTableWidgetItem(start_formatted)
             self.segments_table.setItem(i, 1, start_item)
             
             # End time (format as MM:SS.ms)
-            end_secs = segment["end_sec"]
+            end_secs = segment.end_sec
             end_formatted = f"{int(end_secs // 60):02d}:{end_secs % 60:05.2f}"
             end_item = QTableWidgetItem(end_formatted)
             self.segments_table.setItem(i, 2, end_item)
             
             # Text
-            text_item = QTableWidgetItem(segment["text"])
+            text_item = QTableWidgetItem(segment.text)
             self.segments_table.setItem(i, 3, text_item)
         
         self.segments_table.resizeColumnsToContents()
@@ -578,6 +606,11 @@ class MainWindow(QMainWindow):
             job_widget.deleteLater()
             del self.active_jobs[job_id]
             
+        # Auto-load media in player if available
+        media_path = self.db.get_media_path(job_id)
+        if media_path and Path(media_path).exists():
+            self.player.load(Path(media_path))
+            
     def load_words_for_segment(self, row, _col):
         """Load words for the selected segment.
         
@@ -589,19 +622,19 @@ class MainWindow(QMainWindow):
         seg_item = self.segments_table.item(row, 0)
         segment_id = seg_item.data(Qt.UserRole)
         
-        # Get words using segment_id
-        words = self.db.get_words_by_segment(segment_id)
+        # Get segment using segment_id
+        seg: Segment = self.db.get_segment(segment_id)
         
-        self.words_table.setRowCount(len(words))
-        for i, w in enumerate(words):
-            word_item = QTableWidgetItem(w["text"])
-            # Store word id in UserRole data for editing
-            word_item.setData(Qt.UserRole, w["id"])
+        self.words_table.setRowCount(len(seg.words))
+        for i, w in enumerate(seg.words):
+            word_item = QTableWidgetItem(w.w)
+            # Store word index in UserRole data
+            word_item.setData(Qt.UserRole, i)  # index within seg.words
             self.words_table.setItem(i, 0, word_item)
             
-            self.words_table.setItem(i, 1, QTableWidgetItem(f"{w['start_sec']:.2f}"))
-            self.words_table.setItem(i, 2, QTableWidgetItem(f"{w['end_sec']:.2f}"))
-            self.words_table.setItem(i, 3, QTableWidgetItem(f"{w['score']:.2f}"))
+            self.words_table.setItem(i, 1, QTableWidgetItem(f"{w.s:.2f}"))
+            self.words_table.setItem(i, 2, QTableWidgetItem(f"{w.e:.2f}"))
+            self.words_table.setItem(i, 3, QTableWidgetItem(f"{w.score or 0:.2f}"))
         self.words_table.resizeColumnsToContents()
         
     def on_tab_changed(self, index):
@@ -614,6 +647,34 @@ class MainWindow(QMainWindow):
         if index == 2 and self.segments_table.currentRow() == -1 and self.segments_table.rowCount() > 0:
             self.segments_table.selectRow(0)
             self.load_words_for_segment(0, 0)
+    
+    def on_segment_clicked(self, row, _col):
+        """Seek to the selected segment position.
+        
+        Args:
+            row: The selected row index
+            _col: The selected column index (ignored)
+        """
+        # Get segment_id from the UserRole data
+        seg_item = self.segments_table.item(row, 0)
+        segment_id = seg_item.data(Qt.UserRole)
+        
+        # Get segment using segment_id
+        seg: Segment = self.db.get_segment(segment_id)
+        
+        # Seek to the segment start time
+        self.player.seek(seg.start_sec)
+    
+    def on_word_clicked(self, row, _col):
+        """Seek to the selected word position.
+        
+        Args:
+            row: The selected row index
+            _col: The selected column index (ignored) 
+        """
+        # Get start time directly from the table
+        start_sec = float(self.words_table.item(row, 1).text())
+        self.player.seek(start_sec)
             
     def edit_word(self, row, col):
         """Handle word editing.
@@ -632,9 +693,13 @@ class MainWindow(QMainWindow):
         seg_item = self.segments_table.item(seg_row, 0)
         segment_id = seg_item.data(Qt.UserRole)
         
-        # Get word_id from the UserRole data
+        # Get word index from the UserRole data
         word_item = self.words_table.item(row, 0)
-        word_id = word_item.data(Qt.UserRole)
+        word_index = word_item.data(Qt.UserRole)
+        
+        # Get segment and associated word ID
+        seg: Segment = self.db.get_segment(segment_id)
+        word_id = self.db.get_words_by_segment(segment_id)[word_index]["id"]
         
         # Get old text and prompt for new text
         old = word_item.text()

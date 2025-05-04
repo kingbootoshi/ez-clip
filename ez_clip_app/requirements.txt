@@ -14,3 +14,4 @@ sqlite-utils>=3.30
 
 # Optional dependencies
 matplotlib>=3.6.0
+pydantic>=2.11.4

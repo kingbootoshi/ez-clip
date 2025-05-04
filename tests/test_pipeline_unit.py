@@ -62,7 +62,6 @@ def test_process_file_fast(test_db, fixture_data, tmp_path):
         assert status == Status.DONE
     
     # Verify transcript identical to fixture
-    transcript_data = test_db.get_transcript(1)
-    assert transcript_data is not None
-    md = transcript_data["transcript"]["full_text"]
-    assert md == fixture_data["markdown"]
+    result = test_db.get_transcript(1)
+    assert result is not None
+    assert result.full_text == fixture_data["markdown"]

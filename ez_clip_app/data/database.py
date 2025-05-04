@@ -9,8 +9,14 @@ from pathlib import Path
 import logging
 
 from ez_clip_app.config import DB_PATH, Status
+from ez_clip_app.core.models import Segment, Word, TranscriptionResult
+from pydantic import TypeAdapter
 
 logger = logging.getLogger(__name__)
+
+# TypeAdapters for efficient validation
+_seg_adapter = TypeAdapter(Segment)
+_word_adapter = TypeAdapter(Word)
 
 class DB:
     """Database interface for the WhisperX app."""
@@ -201,14 +207,14 @@ class DB:
                 (Status.QUEUED, Status.RUNNING)
             ).fetchall()
     
-    def get_transcript(self, media_id: int) -> t.Dict:
+    def get_transcript(self, media_id: int) -> TranscriptionResult:
         """Get the most recent complete transcript with segments for a media file.
         
         Args:
             media_id: Media file ID
             
         Returns:
-            Dictionary with transcript and segments, or None if not found.
+            TranscriptionResult object with transcript and segments, or None if not found.
         """
         with self._get_connection() as conn:
             # Get the most recent transcript row for the given media_id
@@ -240,24 +246,42 @@ class DB:
             # Convert rows to dictionaries and fetch associated words
             segments_list = []
             for seg in segments:
-                seg_dict = dict(seg)              # sqlite Row → dict
+                seg_dict = dict(seg)  # sqlite Row → dict
                 # fetch words for this segment_id
                 seg_words = conn.execute(
                     "SELECT * FROM words WHERE segment_id=? ORDER BY start_sec",
                     (seg_dict["id"],)
                 ).fetchall()
-                seg_dict["words"] = [dict(w) for w in seg_words]
                 
-                # Map field names for formatter compatibility
-                seg_dict["start"] = seg_dict["start_sec"]
-                seg_dict["end"] = seg_dict["end_sec"]
+                # Convert words to Word model instances
+                word_models = []
+                for w in seg_words:
+                    word_dict = dict(w)
+                    word = _word_adapter.validate_python({
+                        "w": word_dict["text"],
+                        "s": word_dict["start_sec"],
+                        "e": word_dict["end_sec"],
+                        "score": word_dict["score"]
+                    })
+                    word_models.append(word)
                 
-                segments_list.append(seg_dict)
+                # Create a Segment model instance
+                segment = _seg_adapter.validate_python({
+                    "id": seg_dict["id"],
+                    "speaker": seg_dict["speaker"],
+                    "start_sec": seg_dict["start_sec"],
+                    "end_sec": seg_dict["end_sec"],
+                    "text": seg_dict["text"],
+                    "words": word_models
+                })
+                segments_list.append(segment)
             
-            return {
-                "transcript": dict(transcript),
-                "segments": segments_list
-            }
+            # Create and return TranscriptionResult
+            return TranscriptionResult(
+                segments=segments_list,
+                duration=transcript["duration"],
+                full_text=transcript["full_text"]
+            )
     
     def get_media_path(self, media_id: int) -> str:
         """Get the file path for a media ID.
@@ -356,6 +380,56 @@ class DB:
             # This will cascade delete related transcripts, segments, and words
             conn.execute("DELETE FROM media_files WHERE id = ?", (media_id,))
             
+    def get_segment(self, segment_id: int) -> Segment:
+        """Get a specific segment with its words.
+        
+        Args:
+            segment_id: Segment ID
+            
+        Returns:
+            Segment object with words
+        """
+        with self._get_connection() as conn:
+            # Get the segment
+            row = conn.execute(
+                "SELECT * FROM segments WHERE id=?", 
+                (segment_id,)
+            ).fetchone()
+            
+            if not row:
+                raise ValueError(f"Segment with ID {segment_id} not found")
+            
+            # Get all words for this segment
+            words = conn.execute(
+                "SELECT * FROM words WHERE segment_id=? ORDER BY start_sec",
+                (segment_id,)
+            ).fetchall()
+            
+            # Convert words to Word model instances
+            word_models = []
+            for w in words:
+                word_dict = dict(w)
+                word = _word_adapter.validate_python({
+                    "w": word_dict["text"],
+                    "s": word_dict["start_sec"],
+                    "e": word_dict["end_sec"],
+                    "score": word_dict["score"]
+                })
+                word_models.append(word)
+            
+            # Create a Segment model instance
+            seg_dict = dict(row)
+            segment = _seg_adapter.validate_python({
+                "id": seg_dict["id"],
+                "speaker": seg_dict["speaker"],
+                "start_sec": seg_dict["start_sec"],
+                "end_sec": seg_dict["end_sec"],
+                "text": seg_dict["text"],
+                "words": word_models
+            })
+            
+            return segment
+            
     def get_words_by_segment(self, segment_id: int) -> t.List[sqlite3.Row]:
         """Get words for a specific segment.
         
@@ -418,10 +492,18 @@ class DB:
         Args:
             media_id: Media file ID
         """
-        segs = self.get_transcript(media_id)["segments"]
+        result = self.get_transcript(media_id)  # TranscriptionResult
+        if result is None:
+            logger.warning(f"Cannot regenerate full text: no transcript for media_id {media_id}")
+            return
+            
+        # Convert segment models to dicts for formatting
+        seg_dicts = [s.model_dump() for s in result.segments]
         speaker_map = self.get_speaker_map(media_id)
+        
         from ez_clip_app.core.formatting import segments_to_markdown
-        new_md = segments_to_markdown(segs, speaker_map)
+        new_md = segments_to_markdown(seg_dicts, speaker_map)
+        
         with self._get_connection() as conn:
             conn.execute(
                 "UPDATE transcripts SET full_text=? WHERE media_id=?",

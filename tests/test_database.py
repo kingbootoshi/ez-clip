@@ -51,8 +51,8 @@ def test_insert_and_cascade(test_db, fixture_data):
     )
 
     # assert segments persisted
-    segs = test_db.get_transcript(media_id)["segments"]
-    assert len(segs) == len(fixture_data["segments"])
+    result = test_db.get_transcript(media_id)
+    assert len(result.segments) == len(fixture_data["segments"])
 
     # delete media and ensure cascades
     test_db.delete_media(media_id)

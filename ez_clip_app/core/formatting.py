@@ -23,6 +23,8 @@ def segments_to_markdown(segments: List[Dict], speaker_map: Dict[str, str] = Non
                                have a 'start' key (for sorting) and should have
                                'speaker' and 'text' keys. Missing 'speaker' defaults
                                to 'SPEAKER_UNKNOWN'. Missing 'text' defaults to "".
+                               Can also accept Pydantic model objects, which will be
+                               converted to dictionaries.
         speaker_map (Dict[str, str], optional): A dictionary mapping speaker IDs
                                                to friendly names. If provided, the
                                                friendly names will be used in the
@@ -37,6 +39,14 @@ def segments_to_markdown(segments: List[Dict], speaker_map: Dict[str, str] = Non
     if not segments:
         logger.warning("segments_to_markdown called with empty segment list.")
         return ""
+    
+    # Convert Pydantic models to dictionaries if needed
+    if segments and not isinstance(segments[0], dict):
+        try:
+            segments = [s.model_dump() for s in segments]
+            logger.debug("Converted Pydantic models to dictionaries for formatting")
+        except AttributeError:
+            logger.warning("Segments appear to be non-dict objects without model_dump method")
 
     logger.info(f"Formatting {len(segments)} segments into Markdown.")
 
