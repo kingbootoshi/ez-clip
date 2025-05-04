@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![EZ_CLIP_BANNER](https://github.com/user-attachments/assets/daf01864-0aae-4749-b14e-dafeaaa0bf77)
+![EZ_CLIP_BANNER](https://github.com/user-attachments/assets/6f565be8-5968-4163-830b-5812e870e127)
 
 *A desktop application for high-accuracy video/audio transcription with speaker diarization*
 
