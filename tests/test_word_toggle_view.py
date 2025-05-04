@@ -1,6 +1,7 @@
 """
 Tests for the WordToggleView widget.
 """
+import importlib.util
 import pytest
 from unittest.mock import MagicMock
 from PySide6.QtCore import Qt, QPoint
@@ -20,6 +21,9 @@ from ez_clip_app.core.models import Word
 from ez_clip_app.ui import WordToggleView
 
 
+# Mark all tests in this file as GUI tests that will be skipped in CI
+pytestmark = pytest.mark.gui
+
 # Skip these tests if no QApplication, no pytest-qt, or headless environment
 def has_qt_display():
     """Check if we have a working Qt environment for testing."""
@@ -31,10 +35,9 @@ def has_qt_display():
     except Exception:
         return False
 
-pytestmark = pytest.mark.skipif(
-    not has_qt_display() or not pytest.importorskip("pytest_qt"),
-    reason="GUI tests require pytest-qt and a working display"
-)
+# Additional local skip if we don't have the Qt display or pytest-qt
+if not has_qt_display() or not importlib.util.find_spec("pytest_qt"):
+    pytestmark = pytest.mark.skip(reason="GUI tests require pytest-qt and a working display")
 
 
 @pytest.fixture

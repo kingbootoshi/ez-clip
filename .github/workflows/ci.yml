@@ -22,7 +22,12 @@ jobs:
 
       - name: Install deps
         run: |
-          pip install -r requirements-dev.txt 
+          # Install Qt dependencies for CI
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y libgl1-mesa-glx
+          # Install Python dependencies
+          pip install -r requirements-dev.txt
+          pip install pytest-qt
 
       - name: Run fast tests + coverage
         run: |

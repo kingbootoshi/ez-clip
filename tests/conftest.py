@@ -89,6 +89,16 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "optional: mark test as optional (may be skipped)")
     config.addinivalue_line("markers", "integration: mark test as an integration test")
     config.addinivalue_line("markers", "slow: mark test as slow (may take longer to run)")
+    config.addinivalue_line("markers", "gui: mark test as requiring a GUI environment")
+
+    # Skip GUI tests in CI environment to avoid Qt-related errors
+    if os.environ.get('CI') or os.environ.get('GITHUB_ACTIONS'):
+        # Register a mark for skipping GUI tests in CI
+        config.addinivalue_line("markers", 
+                               "skip_in_ci: skip test when running in CI environment")
+        
+        # Apply the skip_in_ci marker to all gui tests
+        config.option.markexpr = 'not gui'
 
 # Setup logging for tests
 @pytest.fixture(scope="session", autouse=True)

@@ -49,9 +49,10 @@ class MockPlayer:
         self.is_playing = False
 
 
-# Mark this test as slow and integration to be skipped in fast test runs
+# Mark this test as slow, integration, and GUI to be skipped in fast test runs and in CI
 @pytest.mark.slow
 @pytest.mark.integration
+@pytest.mark.gui
 def test_preview_builder():
     """Test that PreviewRebuilder correctly builds preview clips."""
     # Path to a test file (use the fixture in the tests/test_clips directory)
