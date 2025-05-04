@@ -16,7 +16,7 @@ def get_whisper(model_size=DEFAULT_MODEL_SIZE):
     """Get or load WhisperX model.
     
     Args:
-        model_size: Model size ('tiny', 'base', 'small', 'medium', 'large-v1', 'large-v2')
+        model_size: Model size ('tiny', 'base', 'small', 'medium', 'large-v1', 'large-v2', 'turbo')
         
     Returns:
         Loaded WhisperX model

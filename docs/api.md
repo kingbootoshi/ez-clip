@@ -82,7 +82,7 @@ class JobSettings:
 Configuration settings for a transcription job.
 
 #### Attributes:
-- `model_size`: WhisperX model size ('tiny', 'base', 'small', 'medium', 'large-v1', 'large-v2')
+- `model_size`: WhisperX model size ('tiny', 'base', 'small', 'medium', 'large-v1', 'large-v2', 'turbo')
 - `language`: Language code (e.g., 'en', 'es', 'fr') or 'auto' for auto-detection
 - `diarize`: Whether to perform speaker diarization
 - `min_speakers`: Minimum number of speakers to detect
@@ -244,7 +244,7 @@ def get_whisper(model_size=DEFAULT_MODEL_SIZE)
 Get or load WhisperX model.
 
 #### Parameters:
-- `model_size`: Model size ('tiny', 'base', 'small', 'medium', 'large-v1', 'large-v2')
+- `model_size`: Model size ('tiny', 'base', 'small', 'medium', 'large-v1', 'large-v2', 'turbo')
 
 #### Returns:
 - Loaded WhisperX model

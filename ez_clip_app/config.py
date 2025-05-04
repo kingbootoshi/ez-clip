@@ -18,7 +18,7 @@ DB_PATH = DATA_DIR / "transcripts.db"
 DATA_DIR.mkdir(exist_ok=True)
 
 # WhisperX model configuration
-DEFAULT_MODEL_SIZE = "medium"  # tiny, base, small, medium, large-v1, large-v2
+DEFAULT_MODEL_SIZE = "turbo"  # tiny, base, small, medium, large-v1, large-v2, turbo
 DEFAULT_LANGUAGE = "en"        # ISO language code, "auto" for auto-detection
 DEVICE = "cuda" if os.environ.get("USE_GPU", "").lower() == "true" else "cpu"
 

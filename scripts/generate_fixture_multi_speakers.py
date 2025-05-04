@@ -135,7 +135,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--model-size",
         default="medium",
-        choices=["tiny", "base", "small", "medium", "large-v1", "large-v2"],
+        choices=["tiny", "base", "small", "medium", "large-v1", "large-v2", "turbo"],
     )
     parser.add_argument("--language", default="en")
     parser.add_argument(

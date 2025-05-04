@@ -179,7 +179,7 @@ class MainWindow(QMainWindow):
         
         # Model dropdown
         self.model_combo = QComboBox()
-        self.model_combo.addItems(["tiny", "base", "small", "medium", "large-v1", "large-v2"])
+        self.model_combo.addItems(["tiny", "base", "small", "medium", "large-v1", "large-v2", "turbo"])
         self.model_combo.setCurrentText(DEFAULT_MODEL_SIZE)
         settings_layout.addRow("Model Size:", self.model_combo)
         

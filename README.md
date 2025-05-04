@@ -59,7 +59,7 @@ For detailed installation instructions, see our [Installation Guide](docs/instal
    Click "Select Media File" button to choose your video or audio file
 
 3. **Configure transcription settings**
-   - Choose model size (tiny, base, small, medium, large-v1, large-v2)
+   - Choose model size (tiny, base, small, medium, large-v1, large-v2, turbo)
    - Set language or use auto-detection
    - Enable/disable speaker diarization
    - Configure number of speakers
