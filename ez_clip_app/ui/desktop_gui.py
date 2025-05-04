@@ -239,6 +239,9 @@ class MainWindow(QMainWindow):
         self.results_tabs.addTab(self.segments_widget, "Segments")
         self.results_tabs.addTab(self.words_widget, "Words")
         
+        # Connect tab change signal to auto-select first row when Words tab is selected
+        self.results_tabs.currentChanged.connect(self.on_tab_changed)
+        
         # Add results_tabs to the splitter
         splitter.addWidget(self.results_tabs)
         
@@ -557,6 +560,11 @@ class MainWindow(QMainWindow):
         # Connect segment selection to word loading
         self.segments_table.cellClicked.connect(self.load_words_for_segment)
         
+        # Auto-select the first row if segments exist
+        if self.segments_table.rowCount() > 0:
+            self.segments_table.selectRow(0)
+            self.load_words_for_segment(0, 0)
+        
         # Clean up UI for completed job
         if job_id in self.active_jobs:
             job_widget = self.active_jobs[job_id]['widget']
@@ -590,6 +598,17 @@ class MainWindow(QMainWindow):
             self.words_table.setItem(i, 3, QTableWidgetItem(f"{w['score']:.2f}"))
         self.words_table.resizeColumnsToContents()
         
+    def on_tab_changed(self, index):
+        """Handle tab change events.
+        
+        Args:
+            index: The index of the newly selected tab
+        """
+        # If Words tab is selected (index 2) and no segment is selected, auto-select first row
+        if index == 2 and self.segments_table.currentRow() == -1 and self.segments_table.rowCount() > 0:
+            self.segments_table.selectRow(0)
+            self.load_words_for_segment(0, 0)
+            
     def edit_word(self, row, col):
         """Handle word editing.
         

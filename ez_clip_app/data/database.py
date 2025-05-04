@@ -22,13 +22,6 @@ class DB:
             db_path: Path to SQLite database. Can be ":memory:" for in-memory testing.
         """
         self.db_path = Path(db_path)
-        
-        # ALPHA VERSION ONLY: Delete old DB to avoid schema conflicts
-        # Remove this later when moving out of early alpha
-        if self.db_path.exists() and str(self.db_path) != ":memory:":
-            logger.warning(f"Alpha version: Purging old DB at {self.db_path}")
-            self.db_path.unlink()
-            
         self._ensure_tables()
     
     def _get_connection(self) -> sqlite3.Connection:
@@ -45,8 +38,22 @@ class DB:
         with open(schema_path) as f:
             schema_sql = f.read()
         
+        # Modify the schema to use "IF NOT EXISTS" to handle existing tables
+        # This ensures that the script won't fail if tables already exist
         with self._get_connection() as conn:
-            conn.executescript(schema_sql)
+            # First check if we already have the required tables
+            tables = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+            
+            if tables:
+                # Tables exist, just make sure foreign keys are enabled
+                conn.execute("PRAGMA foreign_keys = ON")
+                logger.info("Database tables already exist, skipping schema creation")
+            else:
+                # No tables, execute the full schema
+                logger.info("Creating new database schema")
+                conn.executescript(schema_sql)
     
     def insert_media(self, path: t.Union[str, Path]) -> int:
         """Insert a new media file or get existing ID.
@@ -240,6 +247,11 @@ class DB:
                     (seg_dict["id"],)
                 ).fetchall()
                 seg_dict["words"] = [dict(w) for w in seg_words]
+                
+                # Map field names for formatter compatibility
+                seg_dict["start"] = seg_dict["start_sec"]
+                seg_dict["end"] = seg_dict["end_sec"]
+                
                 segments_list.append(seg_dict)
             
             return {
