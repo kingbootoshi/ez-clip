@@ -1,0 +1,40 @@
+# .github/workflows/ci.yml  — run fast tests + upload coverage
+name: fast-suite
+
+on:
+  push:
+    branches: [ main ]          # or "master"
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:            # optional manual trigger
+
+jobs:
+  test:
+    runs-on: ubuntu-latest     # any runner works
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          pip install -r ez_clip_app/requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run fast tests + coverage
+        run: |
+          pytest -m "not integration and not slow" \
+                 --cov=ez_clip_app \
+                 --cov-report=xml \
+                 --cov-report=term
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml       # produced by pytest-cov
+          flags: fast               # optional label
+          fail_ci_if_error: true
