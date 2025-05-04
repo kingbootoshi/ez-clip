@@ -1,0 +1,416 @@
+{
+  "duration": 64.0,
+  "segments": [
+    {
+      "start": 3.372,
+      "end": 5.795,
+      "text": " This is what you call a prison on your world?",
+      "words": [
+        {
+          "word": "This",
+          "start": 3.372,
+          "end": 3.632,
+          "score": 0.7,
+          "speaker": "01"
+        },
+        {
+          "word": "is",
+          "start": 3.712,
+          "end": 3.813,
+          "score": 0.725,
+          "speaker": "01"
+        },
+        {
+          "word": "what",
+          "start": 3.853,
+          "end": 3.973,
+          "score": 0.974,
+          "speaker": "01"
+        },
+        {
+          "word": "you",
+          "start": 4.013,
+          "end": 4.133,
+          "score": 0.972,
+          "speaker": "01"
+        },
+        {
+          "word": "call",
+          "start": 4.173,
+          "end": 4.453,
+          "score": 0.861,
+          "speaker": "01"
+        },
+        {
+          "word": "a",
+          "start": 4.473,
+          "end": 4.493,
+          "score": 0.907,
+          "speaker": "01"
+        },
+        {
+          "word": "prison",
+          "start": 4.734,
+          "end": 5.054,
+          "score": 0.835,
+          "speaker": "01"
+        },
+        {
+          "word": "on",
+          "start": 5.114,
+          "end": 5.194,
+          "score": 0.949,
+          "speaker": "01"
+        },
+        {
+          "word": "your",
+          "start": 5.234,
+          "end": 5.375,
+          "score": 0.924,
+          "speaker": "01"
+        },
+        {
+          "word": "world?",
+          "start": 5.455,
+          "end": 5.795,
+          "score": 0.754,
+          "speaker": "01"
+        }
+      ],
+      "speaker": "01"
+    },
+    {
+      "start": 8.659,
+      "end": 12.183,
+      "text": "Pathetic!",
+      "words": [
+        {
+          "word": "Pathetic!",
+          "start": 8.659,
+          "end": 12.183,
+          "score": 0.45,
+          "speaker": "01"
+        }
+      ],
+      "speaker": "01"
+    },
+    {
+      "start": 12.203,
+      "end": 14.666,
+      "text": "I would even keep you as a slave in my empire!",
+      "words": [
+        {
+          "word": "I",
+          "start": 12.203,
+          "end": 12.223,
+          "score": 0.444,
+          "speaker": "01"
+        },
+        {
+          "word": "would",
+          "start": 12.243,
+          "end": 12.363,
+          "score": 0.351,
+          "speaker": "01"
+        },
+        {
+          "word": "even",
+          "start": 12.383,
+          "end": 12.484,
+          "score": 0.264,
+          "speaker": "01"
+        },
+        {
+          "word": "keep",
+          "start": 12.504,
+          "end": 12.584,
+          "score": 0.253,
+          "speaker": "01"
+        },
+        {
+          "word": "you",
+          "start": 12.604,
+          "end": 12.744,
+          "score": 0.815,
+          "speaker": "01"
+        },
+        {
+          "word": "as",
+          "start": 12.864,
+          "end": 12.984,
+          "score": 0.556,
+          "speaker": "01"
+        },
+        {
+          "word": "a",
+          "start": 13.044,
+          "end": 13.064,
+          "score": 0.511,
+          "speaker": "01"
+        },
+        {
+          "word": "slave",
+          "start": 13.144,
+          "end": 13.505,
+          "score": 0.925,
+          "speaker": "01"
+        },
+        {
+          "word": "in",
+          "start": 13.745,
+          "end": 13.825,
+          "score": 0.556,
+          "speaker": "01"
+        },
+        {
+          "word": "my",
+          "start": 13.905,
+          "end": 14.005,
+          "score": 0.584,
+          "speaker": "01"
+        },
+        {
+          "word": "empire!",
+          "start": 14.086,
+          "end": 14.666,
+          "score": 0.893,
+          "speaker": "01"
+        }
+      ],
+      "speaker": "01"
+    },
+    {
+      "start": 27.663,
+      "end": 31.067,
+      "text": "After you're in a viltrumite prison, I could use a warm-up.",
+      "words": [
+        {
+          "word": "After",
+          "start": 27.663,
+          "end": 28.163,
+          "score": 0.56,
+          "speaker": "00"
+        },
+        {
+          "word": "you're",
+          "start": 28.183,
+          "end": 28.384,
+          "score": 0.374,
+          "speaker": "00"
+        },
+        {
+          "word": "in",
+          "start": 28.444,
+          "end": 28.524,
+          "score": 0.226,
+          "speaker": "00"
+        },
+        {
+          "word": "a",
+          "start": 28.544,
+          "end": 28.564,
+          "score": 0.001,
+          "speaker": "00"
+        },
+        {
+          "word": "viltrumite",
+          "start": 28.584,
+          "end": 29.024,
+          "score": 0.358,
+          "speaker": "00"
+        },
+        {
+          "word": "prison,",
+          "start": 29.105,
+          "end": 29.485,
+          "score": 0.889,
+          "speaker": "00"
+        },
+        {
+          "word": "I",
+          "start": 29.785,
+          "end": 29.845,
+          "score": 0.955,
+          "speaker": "00"
+        },
+        {
+          "word": "could",
+          "start": 29.886,
+          "end": 30.026,
+          "score": 0.644,
+          "speaker": "00"
+        },
+        {
+          "word": "use",
+          "start": 30.126,
+          "end": 30.226,
+          "score": 0.931,
+          "speaker": "00"
+        },
+        {
+          "word": "a",
+          "start": 30.266,
+          "end": 30.286,
+          "score": 0.977,
+          "speaker": "00"
+        },
+        {
+          "word": "warm-up.",
+          "start": 30.326,
+          "end": 31.067,
+          "score": 0.678,
+          "speaker": "00"
+        }
+      ],
+      "speaker": "00"
+    },
+    {
+      "start": 37.358,
+      "end": 48.184,
+      "text": " I killed you before, and I'll kill you again!",
+      "words": [
+        {
+          "word": "I",
+          "start": 37.358,
+          "end": 37.398,
+          "score": 0.036,
+          "speaker": "02"
+        },
+        {
+          "word": "killed",
+          "start": 37.418,
+          "end": 37.579,
+          "score": 0.363,
+          "speaker": "02"
+        },
+        {
+          "word": "you",
+          "start": 37.599,
+          "end": 37.659,
+          "score": 0.317,
+          "speaker": "02"
+        },
+        {
+          "word": "before,",
+          "start": 37.739,
+          "end": 38.18,
+          "score": 0.94,
+          "speaker": "02"
+        },
+        {
+          "word": "and",
+          "start": 38.541,
+          "end": 39.523,
+          "score": 0.54,
+          "speaker": "02"
+        },
+        {
+          "word": "I'll",
+          "start": 39.543,
+          "end": 39.884,
+          "score": 0.637,
+          "speaker": "02"
+        },
+        {
+          "word": "kill",
+          "start": 40.105,
+          "end": 47.743,
+          "score": 0.447,
+          "speaker": "02"
+        },
+        {
+          "word": "you",
+          "start": 47.763,
+          "end": 48.024,
+          "score": 0.535
+        },
+        {
+          "word": "again!",
+          "start": 48.064,
+          "end": 48.184,
+          "score": 0.257,
+          "speaker": "03"
+        }
+      ],
+      "speaker": "02"
+    },
+    {
+      "start": 48.245,
+      "end": 48.946,
+      "text": "Bass Tiger!",
+      "words": [
+        {
+          "word": "Bass",
+          "start": 48.245,
+          "end": 48.485,
+          "score": 0.831,
+          "speaker": "03"
+        },
+        {
+          "word": "Tiger!",
+          "start": 48.545,
+          "end": 48.946,
+          "score": 0.742,
+          "speaker": "03"
+        }
+      ],
+      "speaker": "03"
+    },
+    {
+      "start": 50.831,
+      "end": 52.515,
+      "text": "What chance do you have against-",
+      "words": [
+        {
+          "word": "What",
+          "start": 50.831,
+          "end": 50.971,
+          "score": 0.45,
+          "speaker": "03"
+        },
+        {
+          "word": "chance",
+          "start": 51.031,
+          "end": 51.332,
+          "score": 0.456,
+          "speaker": "03"
+        },
+        {
+          "word": "do",
+          "start": 51.352,
+          "end": 51.392,
+          "score": 0.413,
+          "speaker": "03"
+        },
+        {
+          "word": "you",
+          "start": 51.412,
+          "end": 51.553,
+          "score": 0.873,
+          "speaker": "03"
+        },
+        {
+          "word": "have",
+          "start": 51.593,
+          "end": 51.753,
+          "score": 0.92,
+          "speaker": "03"
+        },
+        {
+          "word": "against-",
+          "start": 51.793,
+          "end": 52.515,
+          "score": 0.75,
+          "speaker": "03"
+        }
+      ],
+      "speaker": "03"
+    }
+  ],
+  "markdown": "**01:** This is what you call a prison on your world? Pathetic! I would even keep you as a slave in my empire!\n\n**00:** After you're in a viltrumite prison, I could use a warm-up.\n\n**02:** I killed you before, and I'll kill you again!\n\n**03:** Bass Tiger! What chance do you have against-",
+  "model_meta": {
+    "whisper_size": "medium",
+    "diarize": true,
+    "generated_at": "2025-05-04T02:14:58Z"
+  }
+}
