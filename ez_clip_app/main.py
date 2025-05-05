@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
-from ez_clip_app.ui.desktop_gui import MainWindow
+from ez_clip_app.ui.main_window import MainWindow
 from ez_clip_app.assets import ezclip_rc  # noqa: F401  (ensure resource import)
 
 # Configure logging

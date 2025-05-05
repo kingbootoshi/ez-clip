@@ -57,7 +57,7 @@ def test_real_pipeline_matches_fixture(test_db, tmp_path, fixture_data):
     assert transcript_data is not None
     
     # Compare key metrics instead of exact data which can vary between runs
-    real_segments = transcript_data["segments"]
+    real_segments = transcript_data.segments
     fixture_segments = fixture_data["segments"]
     
     # Check we have same number of segments (approximately)
@@ -65,20 +65,20 @@ def test_real_pipeline_matches_fixture(test_db, tmp_path, fixture_data):
         f"Segment count mismatch: got {len(real_segments)}, expected {len(fixture_segments)}"
     
     # Check we have the same speakers
-    real_speakers = {seg["speaker"] for seg in real_segments}
+    real_speakers = {seg.speaker for seg in real_segments}
     fixture_speakers = {seg["speaker"] for seg in fixture_segments}
     assert len(real_speakers) >= len(fixture_speakers) - 1, \
         f"Speaker count mismatch: got {len(real_speakers)}, expected {len(fixture_speakers)}"
     
     # Check that the total text length is similar
-    real_text_len = sum(len(seg["text"]) for seg in real_segments)
+    real_text_len = sum(len(seg.text) for seg in real_segments)
     fixture_text_len = sum(len(seg["text"]) for seg in fixture_segments)
     text_ratio = real_text_len / fixture_text_len if fixture_text_len > 0 else 0
     assert 0.8 <= text_ratio <= 1.2, \
         f"Text length ratio out of bounds: {text_ratio:.2f}"
     
     # Check that the total duration is similar
-    real_duration = transcript_data["transcript"]["duration"]
+    real_duration = transcript_data.duration
     fixture_duration = fixture_data["duration"]
     if fixture_duration > 0:  # Only check if fixture has a duration
         duration_ratio = real_duration / fixture_duration

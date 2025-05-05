@@ -35,7 +35,7 @@ def test_ui_imports():
     This test is marked as optional since it requires PySide6.
     """
     try:
-        from ez_clip_app.ui.desktop_gui import MainWindow
+        from ez_clip_app.ui.main_window import MainWindow
         assert MainWindow is not None, "MainWindow should be defined"
     except ImportError as e:
         pytest.skip(f"UI imports failed (this is acceptable if PySide6 is not installed): {e}") 
