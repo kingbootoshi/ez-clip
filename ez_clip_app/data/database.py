@@ -354,6 +354,9 @@ class DB:
                 """,
                 (media_id, speaker_id, name)
             )
+        
+        # Regenerate full transcript to reflect updated speaker names
+        self._regenerate_full_text(media_id)
             
     def update_transcript_text(self, media_id: int, new_text: str):
         """Overwrite full_text for latest transcript of media_id.
